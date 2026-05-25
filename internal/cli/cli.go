@@ -12,26 +12,31 @@ import (
 	"strings"
 
 	"animeupscale/internal/upscale"
+	"animeupscale/internal/video"
 )
 
 type config struct {
-	Input     string
-	Output    string
-	Engine    string
-	Scale     int
-	Target    string
-	Noise     int
-	Format    string
-	TileSize  int
-	GPUID     string
-	ModelPath string
-	ModelName string
-	Threads   string
-	TTA       bool
-	List      bool
-	Version   bool
-	Sharpen   float64
-	Grayscale bool
+	Input      string
+	Output     string
+	Engine     string
+	Scale      int
+	Target     string
+	Noise      int
+	Format     string
+	TileSize   int
+	GPUID      string
+	ModelPath  string
+	ModelName  string
+	Threads    string
+	TTA        bool
+	List       bool
+	Version    bool
+	Sharpen    float64
+	Grayscale  bool
+	Video      bool
+	FPS        string
+	KeepTemp   bool
+	VideoCodec string
 }
 
 const version = "0.1.0"
@@ -61,6 +66,10 @@ func Run(args []string) error {
 	fs.BoolVar(&cfg.Version, "version", false, "print version")
 	fs.Float64Var(&cfg.Sharpen, "sharpen", 0.15, "builtin-only unsharp amount, 0 disables")
 	fs.BoolVar(&cfg.Grayscale, "grayscale", false, "builtin-only grayscale pass before upscale")
+	fs.BoolVar(&cfg.Video, "video", false, "treat input as video and run the ffmpeg-based video pipeline")
+	fs.StringVar(&cfg.FPS, "fps", "", "optional output fps override for video mode")
+	fs.BoolVar(&cfg.KeepTemp, "keep-temp", false, "keep temp frame directories for video mode")
+	fs.StringVar(&cfg.VideoCodec, "video-codec", "libx264", "video codec for video mode")
 
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Anime image upscaler CLI")
@@ -69,6 +78,7 @@ func Run(args []string) error {
 		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out.png -engine auto -scale 2")
 		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out.png -engine realsr -scale 4")
 		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out-4k.png -engine builtin -target 4k")
+		fmt.Fprintln(fs.Output(), "  anime-upscaler -video -i in.mp4 -o out.mp4 -engine realsr -target 4k")
 		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out.png -engine realesrgan -scale 4 -model-name realesr-animevideov3")
 		fmt.Fprintln(fs.Output(), "  anime-upscaler -i frame.jpg -o frame@4x.png -engine waifu2x -scale 4 -noise 2")
 		fmt.Fprintln(fs.Output(), "  anime-upscaler -list-engines")
@@ -96,6 +106,22 @@ func Run(args []string) error {
 	if cfg.Scale < 1 {
 		return errors.New("scale must be >= 1")
 	}
+	if cfg.Video || isVideoFile(cfg.Input) {
+		if cfg.Output == "" {
+			cfg.Output = defaultVideoOutputPath(cfg.Input, cfg.Target)
+		}
+		processor := video.NewProcessor(manager)
+		return processor.Process(video.Config{
+			Input:      cfg.Input,
+			Output:     cfg.Output,
+			Engine:     strings.ToLower(cfg.Engine),
+			Scale:      cfg.Scale,
+			Target:     strings.ToLower(strings.TrimSpace(cfg.Target)),
+			FPS:        cfg.FPS,
+			KeepTemp:   cfg.KeepTemp,
+			VideoCodec: cfg.VideoCodec,
+		})
+	}
 
 	targetW, targetH, err := resolveTarget(cfg.Input, cfg.Target)
 	if err != nil {
@@ -122,6 +148,7 @@ func Run(args []string) error {
 		Scale:     cfg.Scale,
 		TargetW:   targetW,
 		TargetH:   targetH,
+		Target:    cfg.Target,
 		Noise:     cfg.Noise,
 		Format:    normalizeFormat(cfg.Format, cfg.Output),
 		TileSize:  cfg.TileSize,
@@ -150,6 +177,25 @@ func Run(args []string) error {
 		fmt.Printf("note: %s\n", result.Note)
 	}
 	return nil
+}
+
+func isVideoFile(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".mp4", ".mkv", ".mov", ".avi", ".webm":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultVideoOutputPath(inputPath, target string) string {
+	dir := filepath.Dir(inputPath)
+	base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
+	suffix := "upscaled"
+	if target != "" {
+		suffix = strings.ToLower(strings.TrimSpace(target))
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s-%s.mp4", base, suffix))
 }
 
 func printEngines(manager *upscale.Manager) error {

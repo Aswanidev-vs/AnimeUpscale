@@ -69,3 +69,12 @@ func (m *Manager) Upscale(req Request) (Result, error) {
 	slices.Sort(names)
 	return Result{}, fmt.Errorf("unknown engine %q, supported: %v", req.Engine, names)
 }
+
+func (m *Manager) IsAvailable(name string) (bool, string) {
+	for _, engine := range m.engines {
+		if engine.Name() == name {
+			return engine.Available()
+		}
+	}
+	return false, "unknown engine"
+}

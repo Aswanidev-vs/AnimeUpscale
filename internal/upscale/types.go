@@ -7,6 +7,7 @@ type Request struct {
 	Scale     int
 	TargetW   int
 	TargetH   int
+	Target    string
 	Noise     int
 	Format    string
 	TileSize  int

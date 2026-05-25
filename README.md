@@ -119,7 +119,8 @@ The native binary still expects model directory names compatible with its own lo
 
 Generated from the current workspace:
 
-- [zegion-realsr-clean-4x.jpg](/e:/AnimeUpscale/zegion-realsr-clean-4x.jpg)
+- [zegion-realsr-clean-4x.jpg](zegion_upscale-4k.png)
+
 
 ## References
 
