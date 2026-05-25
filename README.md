@@ -4,20 +4,26 @@ A Go command-line tool for upscaling anime and illustration images.
 
 This project currently has:
 
+- a working `realesrgan` backend using project-level `bin` + `models` layout (recommended for anime)
 - a working `realsr` backend using a project-level `bin` + `models` layout
 - a built-in pure Go fallback for simple upscale and enhancement
-- optional wrappers for `anime4kcpp`, `waifu2x`, `realcugan`, and `realesrgan` if you add those tools separately
+- optional wrappers for `anime4kcpp`, `waifu2x`, and `realcugan` if you add those tools separately
 
 ## Current Status
 
-The main working native backend in this workspace is:
+The working native backends in this workspace are:
 
-- `realsr`
+### Real-ESRGAN (Recommended)
 
-It uses:
+- Binary: [bin/realesrgan-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realesrgan-ncnn-vulkan.exe)
+- Models: [models/](/e:/AnimeUpscale/models/) (includes `realesr-animevideov3-x2/3/4`, `realesrgan-x4plus`, `realesrgan-x4plus-anime`)
+- Default engine for video mode
+- Optimized anime model: `realesr-animevideov3-x4`
 
-- [bin](/e:/AnimeUpscale/bin)
-- [models/realsr](/e:/AnimeUpscale/models/realsr)
+### RealSR
+
+- Binary: [bin/realsr-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realsr-ncnn-vulkan.exe)
+- Models: [models/realsr/](/e:/AnimeUpscale/models/realsr/)
 
 The project is designed so Go stays the main CLI, while native upscalers do the heavy image inference work.
 
@@ -35,16 +41,28 @@ List detected engines:
 go run . -list-engines
 ```
 
-Upscale an image with the working `realsr` backend:
+Upscale an image with Real-ESRGAN (recommended for anime):
 
 ```powershell
-go run . -i zegion.jpg -o zegion-realsr-clean-4x.jpg -engine realsr -scale 4
+go run . -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
+```
+
+Use a different Real-ESRGAN model (photorealistic):
+
+```powershell
+go run . -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus
 ```
 
 Use the built-in fallback:
 
 ```powershell
 go run . -i zegion.jpg -engine builtin -target 4k
+```
+
+Upscale with `realsr`:
+
+```powershell
+go run . -i zegion.jpg -o zegion-realsr-clean-4x.jpg -engine realsr -scale 4
 ```
 
 ## Supported Engines
@@ -66,8 +84,13 @@ go run . -i zegion.jpg -engine builtin -target 4k
   - Wrapper only.
   - Requires `realcugan-ncnn-vulkan` to be installed separately.
 - `realesrgan`
-  - Wrapper only.
-  - Requires `realesrgan-ncnn-vulkan` plus matching Real-ESRGAN NCNN model files.
+  - Working in this workspace.
+  - Uses [realesrgan-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realesrgan-ncnn-vulkan.exe).
+  - Bundled anime models: `realesr-animevideov3-x2`, `realesr-animevideov3-x3`, `realesr-animevideov3-x4`.
+  - Also bundles `realesrgan-x4plus` and `realesrgan-x4plus-anime`.
+  - Default engine for video mode; recommended for anime content.
+  - Use `-model-name` to select a model (default: `realesr-animevideov3`).
+  - Model path auto-detected from [models/](/e:/AnimeUpscale/models/).
 
 ## CLI Usage
 
@@ -78,6 +101,42 @@ anime-upscaler.exe -i input.png -engine builtin -target 4k
 anime-upscaler.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3
 anime-upscaler.exe -list-engines
 ```
+
+## Real-ESRGAN Models
+
+The following models are bundled under [models/](/e:/AnimeUpscale/models/):
+
+| Model Name                  | Scale | Type                     | Command |
+|-----------------------------|-------|--------------------------|---------|
+| `realesr-animevideov3`      | 2     | Anime (default)          | `-scale 2 -model-name realesr-animevideov3` |
+| `realesr-animevideov3-x3`   | 3     | Anime                    | `-scale 3 -model-name realesr-animevideov3-x3` |
+| `realesr-animevideov3-x4`   | 4     | Anime (recommended)      | `-scale 4 -model-name realesr-animevideov3-x4` |
+| `realesrgan-x4plus`         | 4     | Photorealistic           | `-scale 4 -model-name realesrgan-x4plus` |
+| `realesrgan-x4plus-anime`   | 4     | Anime photorealistic 6B  | `-scale 4 -model-name realesrgan-x4plus-anime` |
+
+**Examples:**
+
+```powershell
+# Anime image (default model, 2x upscale)
+.\us.exe -i mpeak.png -o mai.png -engine realesrgan -scale 2 -model-name realesr-animevideov3
+
+# Anime image (4x upscale)
+.\us.exe -i mpeak.png -o mai.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
+
+# Photorealistic image (4x upscale)
+.\us.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus
+
+# Anime photorealistic (4x upscale, 6B variant)
+.\us.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus-anime
+
+# Video (4x upscale → 2K output)
+.\us.exe -i sky.mp4 -o sky-2k.mp4 -engine realesrgan -scale 4 -target 2k -model-name realesr-animevideov3-x4
+
+# Video (4x upscale → 4K output)
+.\us.exe -i sky.mp4 -o sky-4k.mp4 -engine realesrgan -scale 4 -target 4k -model-name realesr-animevideov3-x4
+```
+
+> **Note:** The model name is case-sensitive and must match exactly. The default model if `-model-name` is omitted is `realesr-animevideov3` (the `-x2` variant).
 
 ## Target Presets
 

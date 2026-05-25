@@ -50,7 +50,7 @@ func Run(args []string) error {
 	fs.StringVar(&cfg.Input, "i", "", "input image path")
 	fs.StringVar(&cfg.Output, "output", "", "output image path; defaults to an auto-generated file next to the input")
 	fs.StringVar(&cfg.Output, "o", "", "output image path; defaults to an auto-generated file next to the input")
-	fs.StringVar(&cfg.Engine, "engine", "auto", "engine: auto|anime4kcpp|realsr|waifu2x|realcugan|realesrgan|builtin")
+	fs.StringVar(&cfg.Engine, "engine", "realesrgan", "engine: auto|anime4kcpp|realsr|waifu2x|realcugan|realesrgan|builtin")
 	fs.IntVar(&cfg.Scale, "scale", 2, "upscale ratio")
 	fs.IntVar(&cfg.Scale, "s", 2, "upscale ratio")
 	fs.StringVar(&cfg.Target, "target", "", "target preset: 2k|4k")
@@ -59,7 +59,7 @@ func Run(args []string) error {
 	fs.IntVar(&cfg.TileSize, "tile-size", 0, "tile size for supported external engines")
 	fs.StringVar(&cfg.GPUID, "gpu", "auto", "gpu id for supported external engines; use -1 for cpu")
 	fs.StringVar(&cfg.ModelPath, "model-path", "", "optional external model directory")
-	fs.StringVar(&cfg.ModelName, "model-name", "", "optional external model name, for example realesr-animevideov3")
+	fs.StringVar(&cfg.ModelName, "model-name", "", "external model name (for realesrgan: realesr-animevideov3 for anime)")
 	fs.StringVar(&cfg.Threads, "threads", "", "optional external thread tuple such as 1:2:2")
 	fs.BoolVar(&cfg.TTA, "tta", false, "enable tta mode for supported external engines")
 	fs.BoolVar(&cfg.List, "list-engines", false, "list detected engines")
@@ -120,6 +120,13 @@ func Run(args []string) error {
 			FPS:        cfg.FPS,
 			KeepTemp:   cfg.KeepTemp,
 			VideoCodec: cfg.VideoCodec,
+			ModelName:  cfg.ModelName,
+			ModelPath:  cfg.ModelPath,
+			GPUID:      cfg.GPUID,
+			TileSize:   cfg.TileSize,
+			Threads:    cfg.Threads,
+			TTA:        cfg.TTA,
+			Noise:      cfg.Noise,
 		})
 	}
 

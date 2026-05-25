@@ -22,6 +22,13 @@ type Config struct {
 	FPS        string
 	KeepTemp   bool
 	VideoCodec string
+	ModelName  string
+	ModelPath  string
+	GPUID      string
+	TileSize   int
+	Threads    string
+	TTA        bool
+	Noise      int
 }
 
 type Processor struct {
@@ -59,7 +66,7 @@ func (p *Processor) Process(cfg Config) error {
 
 	engine := strings.ToLower(cfg.Engine)
 	if engine == "" || engine == "auto" {
-		engine = "realsr"
+		engine = "realesrgan"
 	}
 	if engine == "builtin" {
 		return fmt.Errorf("video mode does not support builtin engine; use realsr or another native backend")
@@ -113,14 +120,25 @@ func (p *Processor) Process(cfg Config) error {
 	}
 
 	fmt.Println("stage: upscale")
+	scale := cfg.Scale
+	if scale < 1 {
+		scale = 2
+	}
 	for i, frame := range frameFiles {
 		out := filepath.Join(upscaledDir, filepath.Base(frame))
 		if _, err := p.manager.Upscale(upscale.Request{
-			Input:  frame,
-			Output: out,
-			Engine: engine,
-			Scale:  cfg.Scale,
-			Format: "png",
+			Input:     frame,
+			Output:    out,
+			Engine:    engine,
+			Scale:     scale,
+			Format:    "png",
+			ModelName: cfg.ModelName,
+			ModelPath: cfg.ModelPath,
+			GPUID:     cfg.GPUID,
+			TileSize:  cfg.TileSize,
+			Threads:   cfg.Threads,
+			TTA:       cfg.TTA,
+			Noise:     cfg.Noise,
 		}); err != nil {
 			return fmt.Errorf("upscale frame %d: %w", i+1, err)
 		}

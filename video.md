@@ -53,34 +53,58 @@ You should see `realsr` listed as **available**. The video pipeline requires `re
 
 ## Step 4: Upscale A Video
 
-### Basic 4K Upscale (Recommended)
+### Basic 4K Upscale — RealESRGAN (Recommended for Anime)
 
 ```powershell
-.\animeupscale.exe -video -i kaisaki.mp4 -target 4k -engine realsr
+.\animeupscale.exe -video -i kaisaki.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4
 ```
 
 What this does:
 - `-video` — treat input as video (can be omitted for `.mp4`/`.mkv`/`.mov`/`.avi`/`.webm` files; auto-detected by extension)
 - `-i kaisaki.mp4` — input video
 - `-target 4k` — final output resolution; longest side becomes 3840px, aspect ratio preserved
-- `-engine realsr` — use the RealSR native engine (this is the default for video mode)
+- `-scale 4` — upscale each frame by 4× before fitting to the target resolution
+- `-engine realesrgan` — use the Real-ESRGAN ncnn Vulkan engine (default for video mode)
+- `-model-name realesr-animevideov3-x4` — use the anime-optimized 4× model
 
-The pipeline does the following:
-1. **probe** — reads video metadata (resolution, FPS, audio presence) with ffprobe
-2. **extract** — extracts all frames as PNG images into `temp/<video-name>/frames/`
-3. **upscale** — runs RealSR on every frame, saving to `temp/<video-name>/upscaled/`
-4. **encode** — re-encodes the upscaled frames into a video at the target resolution using ffmpeg
-5. **mux audio** — copies the original audio track into the final output (if present)
+### Basic 4K Upscale — RealSR
 
-On completion, the temp directory is automatically deleted.
+```powershell
+.\animeupscale.exe -video -i kaisaki.mp4 -target 4k -engine realsr
+```
 
 ### 2K Upscale
 
+```powershell
+.\animeupscale.exe -video -i input.mp4 -target 2k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4
+```
+
+Or with RealSR:
 ```powershell
 .\animeupscale.exe -video -i input.mp4 -target 2k -engine realsr
 ```
 
 Longest side becomes 2048px, aspect ratio preserved.
+
+### Anime Video Example (Recommended Settings)
+
+For the best quality with anime content, use the Real-ESRGAN engine with the dedicated anime model:
+
+```powershell
+.\animeupscale.exe -video -i onepiece_demo.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4 -tile-size 256
+```
+
+- `-model-name realesr-animevideov3-x4` — specialized anime model (4× upscale)
+- `-tile-size 256` — process in 256px tiles to reduce GPU memory usage
+
+The pipeline does the following:
+1. **probe** — reads video metadata (resolution, FPS, audio presence) with ffprobe
+2. **extract** — extracts all frames as PNG images into `temp/<video-name>/frames/`
+3. **upscale** — runs the chosen engine on every frame, saving to `temp/<video-name>/upscaled/`
+4. **encode** — re-encodes the upscaled frames into a video at the target resolution using ffmpeg
+5. **mux audio** — copies the original audio track into the final output (if present)
+
+On completion, the temp directory is automatically deleted.
 
 ## Advanced Options
 

@@ -18,11 +18,11 @@ type Manager struct {
 func NewManager() *Manager {
 	return &Manager{
 		engines: []Engine{
-			NewAnime4KCPPEngine(),
+			NewRealESRGANEngine(),
 			NewRealSREngine(),
+			NewAnime4KCPPEngine(),
 			NewWaifu2xEngine(),
 			NewRealCUGANEngine(),
-			NewRealESRGANEngine(),
 			NewBuiltinEngine(),
 		},
 	}

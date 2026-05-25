@@ -101,9 +101,10 @@ func NewRealESRGANEngine() Engine {
 	return externalEngine{
 		name:     "realesrgan",
 		binaries: []string{"realesrgan-ncnn-vulkan.exe", "realesrgan-ncnn-vulkan"},
-		note:     "wrapped Real-ESRGAN ncnn Vulkan engine via cgo runner",
+		note:     "wrapped Real-ESRGAN ncnn Vulkan engine (default: realesr-animevideov3; use -model-name realesrgan-x4plus-anime for 6B variant)",
 		locate:   locateRealESRGAN,
-		runner:   nativeexec.Run,
+		// Omit runner to use default exec.Command, avoiding
+		// CWD issues when the binary is in a subdirectory like bin/
 		builder: func(req Request, _ string) []string {
 			scale := req.Scale
 			if scale < 2 {
@@ -121,6 +122,13 @@ func NewRealESRGANEngine() Engine {
 			}
 			if modelName == "" {
 				modelName = "realesr-animevideov3"
+			}
+			// Map convenience aliases to actual ncnn model names
+			switch modelName {
+			case "realesrgan-x4plus-anime-6b", "RealESRGAN_x4plus_anime_6B", "realesrgan-6b":
+				modelName = "realesrgan-x4plus-anime"
+			case "realesrgan-x4plus", "realesrgan-4x":
+				modelName = "realesrgan-x4plus"
 			}
 
 			args := []string{
@@ -298,10 +306,18 @@ func locateRealESRGAN() (binaryPath, modelPath string, ok bool, detail string) {
 		if path, err := exec.LookPath(candidate); err == nil {
 			return path, findRealESRGANModels("."), true, "PATH"
 		}
+		// Also check current directory
+		if fileExists(candidate) {
+			model := findRealESRGANModels(".")
+			return filepath.Clean(candidate), model, true, "workspace"
+		}
 	}
 
 	roots := []string{
+		".",
+		"bin",
 		"realesrgan-ncnn-vulkan-v0.2.0-windows",
+		"realesrgan-ncnn-vulkan-20220424-windows",
 		"Real-ESRGAN-ncnn-vulkan",
 		filepath.Join("Real-ESRGAN-ncnn-vulkan", "build", "install", "bin"),
 		filepath.Join("Real-ESRGAN-ncnn-vulkan", "build", "bin"),
@@ -361,6 +377,7 @@ func findRealESRGANModels(root string) string {
 	candidates := []string{
 		filepath.Join(root, "models"),
 		filepath.Join(root, "realesrgan-ncnn-vulkan-v0.2.0-windows", "models"),
+		filepath.Join(root, "realesrgan-ncnn-vulkan-20220424-windows", "models"),
 		filepath.Join(root, "Real-ESRGAN-ncnn-vulkan", "models"),
 		filepath.Join(root, "realesrgan-ncnn-vulkan", "models"),
 	}
