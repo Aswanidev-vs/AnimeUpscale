@@ -16,27 +16,28 @@ import (
 )
 
 type config struct {
-	Input      string
-	Output     string
-	Engine     string
-	Scale      int
-	Target     string
-	Noise      int
-	Format     string
-	TileSize   int
-	GPUID      string
-	ModelPath  string
-	ModelName  string
-	Threads    string
-	TTA        bool
-	List       bool
-	Version    bool
-	Sharpen    float64
-	Grayscale  bool
-	Video      bool
-	FPS        string
-	KeepTemp   bool
-	VideoCodec string
+	Input        string
+	Output       string
+	Engine       string
+	Scale        int
+	Target       string
+	Noise        int
+	Format       string
+	TileSize     int
+	GPUID        string
+	ModelPath    string
+	ModelName    string
+	Threads      string
+	TTA          bool
+	List         bool
+	Version      bool
+	Sharpen      float64
+	Grayscale    bool
+	Video        bool
+	FPS          string
+	KeepTemp     bool
+	VideoCodec   string
+	VideoWorkers int
 }
 
 const version = "0.1.0"
@@ -70,6 +71,7 @@ func Run(args []string) error {
 	fs.StringVar(&cfg.FPS, "fps", "", "optional output fps override for video mode")
 	fs.BoolVar(&cfg.KeepTemp, "keep-temp", false, "keep temp frame directories for video mode")
 	fs.StringVar(&cfg.VideoCodec, "video-codec", "libx264", "video codec for video mode")
+	fs.IntVar(&cfg.VideoWorkers, "video-workers", 1, "number of parallel upscaling workers for video mode (1 = sequential)")
 
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Anime image upscaler CLI")
@@ -110,6 +112,10 @@ func Run(args []string) error {
 		if cfg.Output == "" {
 			cfg.Output = defaultVideoOutputPath(cfg.Input, cfg.Target)
 		}
+		if cfg.VideoWorkers < 1 {
+			return errors.New("video-workers must be >= 1")
+		}
+
 		processor := video.NewProcessor(manager)
 		return processor.Process(video.Config{
 			Input:      cfg.Input,
@@ -120,6 +126,7 @@ func Run(args []string) error {
 			FPS:        cfg.FPS,
 			KeepTemp:   cfg.KeepTemp,
 			VideoCodec: cfg.VideoCodec,
+			Workers:    cfg.VideoWorkers,
 			ModelName:  cfg.ModelName,
 			ModelPath:  cfg.ModelPath,
 			GPUID:      cfg.GPUID,

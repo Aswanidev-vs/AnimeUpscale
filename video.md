@@ -241,9 +241,19 @@ Video upscaling processes every frame individually through the neural network. F
 - Using a GPU with Vulkan support for faster inference
 - Reducing the output FPS if appropriate
 
+If you still need faster processing, you can now run frames in parallel using multiple workers:
+
+```powershell
+.\animeupscale.exe -video -i violet.mp4 -o violet-4k.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4 -video-workers 4
+```
+
+- `-video-workers` controls how many frames are upscaled concurrently (default is `1`)
+- Use `1` if the GPU/engine becomes unstable; increase gradually (2–4 often works well)
+
 ### Temp Files Consuming Disk Space
 
 If a pipeline fails, temp files are kept automatically. Clean them up manually:
 
 ```powershell
 Remove-Item -Recurse -Force temp\
+```

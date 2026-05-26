@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"animeupscale/internal/upscale"
 )
@@ -22,13 +23,16 @@ type Config struct {
 	FPS        string
 	KeepTemp   bool
 	VideoCodec string
-	ModelName  string
-	ModelPath  string
-	GPUID      string
-	TileSize   int
-	Threads    string
-	TTA        bool
-	Noise      int
+
+	Workers int
+
+	ModelName string
+	ModelPath string
+	GPUID     string
+	TileSize  int
+	Threads   string
+	TTA       bool
+	Noise     int
 }
 
 type Processor struct {
@@ -124,24 +128,131 @@ func (p *Processor) Process(cfg Config) error {
 	if scale < 1 {
 		scale = 2
 	}
-	for i, frame := range frameFiles {
-		out := filepath.Join(upscaledDir, filepath.Base(frame))
-		if _, err := p.manager.Upscale(upscale.Request{
-			Input:     frame,
-			Output:    out,
-			Engine:    engine,
-			Scale:     scale,
-			Format:    "png",
-			ModelName: cfg.ModelName,
-			ModelPath: cfg.ModelPath,
-			GPUID:     cfg.GPUID,
-			TileSize:  cfg.TileSize,
-			Threads:   cfg.Threads,
-			TTA:       cfg.TTA,
-			Noise:     cfg.Noise,
-		}); err != nil {
-			return fmt.Errorf("upscale frame %d: %w", i+1, err)
+
+	workers := cfg.Workers
+	if workers < 1 {
+		workers = 1
+	}
+	total := len(frameFiles)
+
+	// Ensure stable filenames order in case Glob returns unsorted results.
+	// We rely on frame_%06d.png naming; parse the numeric suffix.
+	type frameJob struct {
+		idx   int
+		path  string
+		out   string
+		order int
+	}
+	jobs := make([]frameJob, 0, total)
+	for _, frame := range frameFiles {
+		base := filepath.Base(frame) // frame_000001.png
+		num := 0
+		if strings.HasPrefix(base, "frame_") && strings.HasSuffix(base, ".png") {
+			s := strings.TrimSuffix(strings.TrimPrefix(base, "frame_"), ".png")
+			parsed, err := strconv.Atoi(s)
+			if err == nil {
+				num = parsed
+			}
 		}
+		jobs = append(jobs, frameJob{
+			idx:   len(jobs),
+			path:  frame,
+			out:   filepath.Join(upscaledDir, base),
+			order: num,
+		})
+	}
+
+	// Simple insertion sort by order (no extra deps).
+	for i := 1; i < len(jobs); i++ {
+		j := jobs[i]
+		k := i - 1
+		for k >= 0 && jobs[k].order > j.order {
+			jobs[k+1] = jobs[k]
+			k--
+		}
+		jobs[k+1] = j
+	}
+
+	progressBar := func(done, total int) {
+		width := 30
+		p := float64(done) / float64(total)
+		filled := int(p * float64(width))
+		if filled > width {
+			filled = width
+		}
+		empty := width - filled
+		// carriage return so it updates in-place
+		fmt.Printf("\r[%s%s] %3d/%d (%.1f%%)", strings.Repeat("=", filled), strings.Repeat(" ", empty), done, total, p*100)
+		if done == total {
+			fmt.Printf("\n")
+		}
+	}
+
+	// Worker pool
+	type jobResult struct {
+		jobIdx int
+		err    error
+	}
+	jobCh := make(chan frameJob)
+	resCh := make(chan jobResult, workers)
+
+	done := 0
+	var doneMu sync.Mutex
+	var once sync.Once
+	var firstErr error
+
+	progressBar(0, total)
+
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobCh {
+				_, err := p.manager.Upscale(upscale.Request{
+					Input:     job.path,
+					Output:    job.out,
+					Engine:    engine,
+					Scale:     scale,
+					Format:    "png",
+					ModelName: cfg.ModelName,
+					ModelPath: cfg.ModelPath,
+					GPUID:     cfg.GPUID,
+					TileSize:  cfg.TileSize,
+					Threads:   cfg.Threads,
+					TTA:       cfg.TTA,
+					Noise:     cfg.Noise,
+				})
+				resCh <- jobResult{jobIdx: job.idx, err: err}
+			}
+		}()
+	}
+
+	// Enqueue jobs
+	go func() {
+		for _, job := range jobs {
+			jobCh <- job
+		}
+		close(jobCh)
+	}()
+
+	// Collect results
+	for i := 0; i < total; i++ {
+		r := <-resCh
+		if r.err != nil {
+			once.Do(func() { firstErr = r.err })
+		}
+		doneMu.Lock()
+		done++
+		currDone := done
+		doneMu.Unlock()
+		progressBar(currDone, total)
+	}
+
+	wg.Wait()
+
+	if firstErr != nil {
+		return fmt.Errorf("upscale failed: %w", firstErr)
 	}
 
 	targetW, targetH := targetDimensions(info.Width*cfg.Scale, info.Height*cfg.Scale, cfg.Target)
