@@ -102,6 +102,30 @@ anime-upscaler.exe -i input.png -o output.png -engine realesrgan -scale 4 -model
 anime-upscaler.exe -list-engines
 ```
 
+## Video Benchmark Mode
+
+When upscaling videos (`.mp4/.mkv/.mov/.avi/.webm`) you can enable per-stage timing with:
+
+```powershell
+anime-upscaler.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -benchmark
+```
+
+Notes:
+- Timing is printed to the terminal for these stages:
+  - `probe`
+  - `extract`
+  - `upscale`
+  - `encode/mux` (and audio mux is included when present)
+- A JSON file is written to the project root: `bench.json`
+- Video concurrency is controlled by `-video-workers` (default: `1`):
+
+```powershell
+anime-upscaler.exe -video -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -video-workers 4 -benchmark
+```
+anime-upscaler.exe -video -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -video-workers 4 -benchmark
+anime-upscaler.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -benchmark
+anime-upscaler.exe -list-engines
+
 ## Real-ESRGAN Models
 
 The following models are bundled under [models/](/e:/AnimeUpscale/models/):

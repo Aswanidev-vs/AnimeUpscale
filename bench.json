@@ -1,0 +1,19 @@
+{
+  "input": "violet.mp4",
+  "output": "violet-f4k.mp4",
+  "engine": "realesrgan",
+  "scale": 4,
+  "target": "4k",
+  "workers": 4,
+  "model_name": "realesr-animevideov3-x4",
+  "gpu_id": "auto",
+  "tta": false,
+  "frames": 309,
+  "stages": {
+    "encode_seconds": 44.7832292,
+    "extract_seconds": 1.6779614,
+    "probe_seconds": 0.0527173,
+    "upscale_seconds": 253.919553
+  },
+  "total_seconds": 302.282713
+}

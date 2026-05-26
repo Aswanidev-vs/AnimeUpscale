@@ -38,6 +38,7 @@ type config struct {
 	KeepTemp     bool
 	VideoCodec   string
 	VideoWorkers int
+	Benchmark    bool
 }
 
 const version = "0.1.0"
@@ -72,6 +73,7 @@ func Run(args []string) error {
 	fs.BoolVar(&cfg.KeepTemp, "keep-temp", false, "keep temp frame directories for video mode")
 	fs.StringVar(&cfg.VideoCodec, "video-codec", "libx264", "video codec for video mode")
 	fs.IntVar(&cfg.VideoWorkers, "video-workers", 1, "number of parallel upscaling workers for video mode (1 = sequential)")
+	fs.BoolVar(&cfg.Benchmark, "benchmark", false, "print per-stage timings and write benchmark JSON (bench.json)")
 
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Anime image upscaler CLI")
@@ -134,6 +136,7 @@ func Run(args []string) error {
 			Threads:    cfg.Threads,
 			TTA:        cfg.TTA,
 			Noise:      cfg.Noise,
+			Benchmark:  cfg.Benchmark,
 		})
 	}
 

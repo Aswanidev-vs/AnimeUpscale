@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"animeupscale/internal/upscale"
 )
@@ -33,6 +34,8 @@ type Config struct {
 	Threads   string
 	TTA       bool
 	Noise     int
+
+	Benchmark bool
 }
 
 type Processor struct {
@@ -85,10 +88,20 @@ func (p *Processor) Process(cfg Config) error {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 
+	var probeStart time.Time
+	if cfg.Benchmark {
+		probeStart = time.Now()
+	}
+
+	stages := map[string]any{}
 	fmt.Println("stage: probe")
 	info, err := probeVideo(cfg.Input)
 	if err != nil {
 		return err
+	}
+	if cfg.Benchmark {
+		stages["probe_seconds"] = time.Since(probeStart).Seconds()
+		fmt.Printf("benchmark: probe %.3fs\n", stages["probe_seconds"].(float64))
 	}
 
 	jobID := sanitizeBaseName(strings.TrimSuffix(filepath.Base(cfg.Input), filepath.Ext(cfg.Input)))
@@ -103,16 +116,74 @@ func (p *Processor) Process(cfg Config) error {
 		return fmt.Errorf("create upscaled dir: %w", err)
 	}
 	success := false
+
+	type benchData struct {
+		Input   string `json:"input"`
+		Output  string `json:"output"`
+		Engine  string `json:"engine"`
+		Scale   int    `json:"scale"`
+		Target  string `json:"target"`
+		Workers int    `json:"workers"`
+
+		ModelName string `json:"model_name,omitempty"`
+		ModelPath string `json:"model_path,omitempty"`
+		GPUID     string `json:"gpu_id,omitempty"`
+		TileSize  int    `json:"tile_size,omitempty"`
+		Threads   string `json:"threads,omitempty"`
+		TTA       bool   `json:"tta"`
+		Noise     int    `json:"noise,omitempty"`
+
+		Frames       int            `json:"frames,omitempty"`
+		Stages       map[string]any `json:"stages"`
+		TotalSeconds float64        `json:"total_seconds"`
+	}
+
+	var bench benchData
+	var totalStart time.Time
+
+	bench.Stages = stages
+
+	if cfg.Benchmark {
+		totalStart = time.Now()
+		bench.Input = cfg.Input
+		bench.Output = cfg.Output
+		bench.Engine = engine
+		bench.Scale = cfg.Scale
+		bench.Target = cfg.Target
+		bench.Workers = cfg.Workers
+		bench.ModelName = cfg.ModelName
+		bench.ModelPath = cfg.ModelPath
+		bench.GPUID = cfg.GPUID
+		bench.TileSize = cfg.TileSize
+		bench.Threads = cfg.Threads
+		bench.TTA = cfg.TTA
+		bench.Noise = cfg.Noise
+	}
+
 	defer func() {
 		if !cfg.KeepTemp && success {
 			_ = os.RemoveAll(workRoot)
 		}
+		if cfg.Benchmark {
+			bench.TotalSeconds = time.Since(totalStart).Seconds()
+
+			out, _ := json.MarshalIndent(bench, "", "  ")
+			_ = os.WriteFile("bench.json", out, 0o644)
+		}
 	}()
 
+	var extractStart time.Time
+	if cfg.Benchmark {
+		extractStart = time.Now()
+	}
 	fmt.Println("stage: extract")
 	framePattern := filepath.Join(framesDir, "frame_%06d.png")
 	if err := runFFmpeg("-y", "-i", cfg.Input, framePattern); err != nil {
 		return fmt.Errorf("extract frames: %w", err)
+	}
+	if cfg.Benchmark {
+		stages["extract_seconds"] = time.Since(extractStart).Seconds()
+		fmt.Printf("benchmark: extract %.3fs\n", stages["extract_seconds"].(float64))
 	}
 
 	frameFiles, err := filepath.Glob(filepath.Join(framesDir, "*.png"))
@@ -123,7 +194,11 @@ func (p *Processor) Process(cfg Config) error {
 		return fmt.Errorf("no frames extracted from input video")
 	}
 
+	var upscaleStart time.Time
 	fmt.Println("stage: upscale")
+	if cfg.Benchmark {
+		upscaleStart = time.Now()
+	}
 	scale := cfg.Scale
 	if scale < 1 {
 		scale = 2
@@ -134,6 +209,7 @@ func (p *Processor) Process(cfg Config) error {
 		workers = 1
 	}
 	total := len(frameFiles)
+	bench.Frames = total
 
 	// Ensure stable filenames order in case Glob returns unsorted results.
 	// We rely on frame_%06d.png naming; parse the numeric suffix.
@@ -182,10 +258,16 @@ func (p *Processor) Process(cfg Config) error {
 		}
 		empty := width - filled
 		// carriage return so it updates in-place
+		// IMPORTANT: do NOT print newline when upscale reaches 100%.
+		// The newline should only happen after:
+		//   stage: encode
+		//   stage: mux audio
 		fmt.Printf("\r[%s%s] %3d/%d (%.1f%%)", strings.Repeat("=", filled), strings.Repeat(" ", empty), done, total, p*100)
-		if done == total {
-			fmt.Printf("\n")
-		}
+	}
+
+	finishProgress := func() {
+		// Ensure cursor moves to the next line after encode/mux completes.
+		fmt.Printf("\n")
 	}
 
 	// Worker pool
@@ -254,6 +336,14 @@ func (p *Processor) Process(cfg Config) error {
 	if firstErr != nil {
 		return fmt.Errorf("upscale failed: %w", firstErr)
 	}
+	if cfg.Benchmark {
+		stages["upscale_seconds"] = time.Since(upscaleStart).Seconds()
+		fmt.Printf("benchmark: upscale %.3fs\n", stages["upscale_seconds"].(float64))
+	}
+
+	// Upscale is complete; show final 100% but keep progress bar line “open”
+	// until encode + mux finish.
+	progressBar(total, total)
 
 	targetW, targetH := targetDimensions(info.Width*cfg.Scale, info.Height*cfg.Scale, cfg.Target)
 	fps := cfg.FPS
@@ -268,6 +358,10 @@ func (p *Processor) Process(cfg Config) error {
 		codec = "libx264"
 	}
 
+	var encodeStart time.Time
+	if cfg.Benchmark {
+		encodeStart = time.Now()
+	}
 	fmt.Println("stage: encode")
 	upscaledPattern := filepath.Join(upscaledDir, "frame_%06d.png")
 	args := []string{
@@ -288,6 +382,15 @@ func (p *Processor) Process(cfg Config) error {
 	if err := runFFmpeg(args...); err != nil {
 		return fmt.Errorf("encode video: %w", err)
 	}
+	if cfg.Benchmark {
+		// include mux audio inside the encode ffmpeg call when audio exists
+		stages["encode_seconds"] = time.Since(encodeStart).Seconds()
+
+		fmt.Printf("benchmark: encode/mux %.3fs\n", stages["encode_seconds"].(float64))
+	}
+
+	// encode finished (and mux audio stage may have run above)
+	finishProgress()
 
 	success = true
 	return nil
