@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"animeupscale/internal/upscale"
+	"github.com/Aswanidev-vs/animeupscale/internal/upscale"
 )
 
 type Config struct {

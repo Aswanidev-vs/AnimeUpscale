@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"animeupscale/internal/cli"
+	"github.com/Aswanidev-vs/animeupscale/internal/cli"
 )
 
 func main() {

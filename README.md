@@ -27,10 +27,19 @@ The working native backends in this workspace are:
 
 The project is designed so Go stays the main CLI, while native upscalers do the heavy image inference work.
 
-## Build
+## Build / Install
+
+### Install (recommended)
 
 ```powershell
-go build -o anime-upscaler.exe .
+go install github.com/Aswanidev-vs/animeupscale@latest
+```
+
+This places the compiled executable in your Go bin directory (typically `%GOPATH%\bin`).
+
+### Build a local executable (optional)
+```powershell
+go build -o au.exe .
 ```
 
 ## Quick Start
@@ -95,20 +104,28 @@ go run . -i zegion.jpg -o zegion-realsr-clean-4x.jpg -engine realsr -scale 4
 ## CLI Usage
 
 ```powershell
-anime-upscaler.exe -i input.png -o output.png -engine auto -scale 2
-anime-upscaler.exe -i input.png -o output.png -engine realsr -scale 4
-anime-upscaler.exe -i input.png -engine builtin -target 4k
-anime-upscaler.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3
-anime-upscaler.exe -list-engines
+au.exe -i input.png -o output.png -engine auto -scale 2
+au.exe -i input.png -o output.png -engine realsr -scale 4
+au.exe -i input.png -engine builtin -target 4k
+au.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3
+au.exe -list-engines
 ```
 
-## Video Benchmark Mode
+## Anime vs Real Photos
+
+Anime quality: Best with `realesrgan` anime models (realesr-animevideov3-*), which are tuned for line-art/anime style.
+
+Real photos: Yes, it works, but quality depends on the selected engine/model:
+- Use `realesrgan-x4plus` (`-model-name realesrgan-x4plus`) for more photorealistic results.
+- Use `realsr` for another real-world SR option (photo-ish results may be decent, but less “anime-optimized” than the anime models).
+- The built-in `builtin` engine also works for photos, but it’s a simpler Go upscale/enhance and typically won’t match native-engine quality.
 
 When upscaling videos (`.mp4/.mkv/.mov/.avi/.webm`) you can enable per-stage timing with:
 
 ```powershell
-anime-upscaler.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -benchmark
+au.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 
 ```
+au.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 
 
 Notes:
 - Timing is printed to the terminal for these stages:
@@ -120,11 +137,26 @@ Notes:
 - Video concurrency is controlled by `-video-workers` (default: `1`):
 
 ```powershell
-anime-upscaler.exe -video -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -video-workers 4 -benchmark
+au.exe -video -i input.mp4 -o output.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4 -video-workers 4 -benchmark
 ```
-anime-upscaler.exe -video -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -video-workers 4 -benchmark
-anime-upscaler.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 -benchmark
-anime-upscaler.exe -list-engines
+
+### What `-benchmark` does
+- Prints elapsed time for:
+  - `probe` (ffprobe metadata parsing)
+  - `extract` (ffmpeg frame extraction)
+  - `upscale` (parallel frame upscaling)
+  - `encode/mux` (ffmpeg encoding; includes audio mux when present)
+- Writes `bench.json` to the project root.
+- The progress bar newline behavior is preserved: the progress line ends only after `stage: encode` and (when audio exists) `stage: mux audio`.
+
+### What `-video-workers` does
+- Controls the number of frames being upscaled concurrently (a bounded goroutine worker pool).
+- `1` means sequential upscale.
+- Higher values can be faster but may stress the GPU / native engine.
+
+```powershell
+au.exe -video -i input.mp4 -o output.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4 -video-workers 4 
+```
 
 ## Real-ESRGAN Models
 
@@ -142,22 +174,22 @@ The following models are bundled under [models/](/e:/AnimeUpscale/models/):
 
 ```powershell
 # Anime image (default model, 2x upscale)
-.\us.exe -i mpeak.png -o mai.png -engine realesrgan -scale 2 -model-name realesr-animevideov3
+au.exe -i mpeak.png -o mai.png -engine realesrgan -scale 2 -model-name realesr-animevideov3
 
 # Anime image (4x upscale)
-.\us.exe -i mpeak.png -o mai.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
+au.exe -i mpeak.png -o mai.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
 
 # Photorealistic image (4x upscale)
-.\us.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus
+au.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus
 
 # Anime photorealistic (4x upscale, 6B variant)
-.\us.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus-anime
+au.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus-anime
 
 # Video (4x upscale → 2K output)
-.\us.exe -i sky.mp4 -o sky-2k.mp4 -engine realesrgan -scale 4 -target 2k -model-name realesr-animevideov3-x4
+au.exe -i sky.mp4 -o sky-2k.mp4 -engine realesrgan -scale 4 -target 2k -model-name realesr-animevideov3-x4
 
 # Video (4x upscale → 4K output)
-.\us.exe -i sky.mp4 -o sky-4k.mp4 -engine realesrgan -scale 4 -target 4k -model-name realesr-animevideov3-x4
+au.exe -i sky.mp4 -o sky-4k.mp4 -engine realesrgan -scale 4 -target 4k -model-name realesr-animevideov3-x4
 ```
 
 > **Note:** The model name is case-sensitive and must match exactly. The default model if `-model-name` is omitted is `realesr-animevideov3` (the `-x2` variant).

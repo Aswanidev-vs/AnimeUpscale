@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"animeupscale/internal/upscale"
-	"animeupscale/internal/video"
+	"github.com/Aswanidev-vs/animeupscale/internal/upscale"
+	"github.com/Aswanidev-vs/animeupscale/internal/video"
 )
 
 type config struct {
@@ -79,13 +79,13 @@ func Run(args []string) error {
 		fmt.Fprintln(fs.Output(), "Anime image upscaler CLI")
 		fmt.Fprintln(fs.Output(), "")
 		fmt.Fprintln(fs.Output(), "Examples:")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out.png -engine auto -scale 2")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out.png -engine realsr -scale 4")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out-4k.png -engine builtin -target 4k")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -video -i in.mp4 -o out.mp4 -engine realsr -target 4k")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -i in.png -o out.png -engine realesrgan -scale 4 -model-name realesr-animevideov3")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -i frame.jpg -o frame@4x.png -engine waifu2x -scale 4 -noise 2")
-		fmt.Fprintln(fs.Output(), "  anime-upscaler -list-engines")
+		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine auto -scale 2")
+		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realsr -scale 4")
+		fmt.Fprintln(fs.Output(), "  au -i in.png -o out-4k.png -engine builtin -target 4k")
+		fmt.Fprintln(fs.Output(), "  au -video -i in.mp4 -o out.mp4 -engine realsr -target 4k")
+		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realesrgan -scale 4 -model-name realesr-animevideov3")
+		fmt.Fprintln(fs.Output(), "  au -i frame.jpg -o frame@4x.png -engine waifu2x -scale 4 -noise 2")
+		fmt.Fprintln(fs.Output(), "  au -list-engines")
 		fmt.Fprintln(fs.Output(), "")
 		fs.PrintDefaults()
 	}

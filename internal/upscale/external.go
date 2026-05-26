@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"animeupscale/internal/nativeexec"
+	"github.com/Aswanidev-vs/animeupscale/internal/nativeexec"
 )
 
 type externalEngine struct {
