@@ -31,11 +31,20 @@ The project is designed so Go stays the main CLI, while native upscalers do the 
 
 ### Install (recommended)
 
+#### Install the `animeupscale` CLI
 ```powershell
 go install github.com/Aswanidev-vs/animeupscale@latest
 ```
 
 This places the compiled executable in your Go bin directory (typically `%GOPATH%\bin`).
+
+#### Install the `au` CLI alias
+This repo includes an additional entrypoint at `cmd/au`, so you can install a binary/command named `au`.
+```powershell
+go install github.com/Aswanidev-vs/animeupscale/cmd/au@latest
+```
+
+> After this, you should run `au.exe ...` (or `au ...` on non-Windows).
 
 ### Build a local executable (optional)
 ```powershell
