@@ -24,9 +24,17 @@ func Run(binary string, args []string) ([]byte, error) {
 	defer C.free(unsafe.Pointer(cbin))
 	argv = append(argv, cbin)
 
+	// Free each string slice arg inside a helper function to avoid defer-in-loop resource leaks
+	cargs := make([]*C.char, 0, len(args))
+	defer func() {
+		for _, carg := range cargs {
+			C.free(unsafe.Pointer(carg))
+		}
+	}()
+
 	for _, arg := range args {
 		carg := C.CString(arg)
-		defer C.free(unsafe.Pointer(carg))
+		cargs = append(cargs, carg)
 		argv = append(argv, carg)
 	}
 	argv = append(argv, nil)

@@ -380,6 +380,7 @@ func (p *Processor) Process(cfg Config) error {
 	}
 	args = append(args, cfg.Output)
 	if err := runFFmpeg(args...); err != nil {
+		_ = os.Remove(cfg.Output) // prevent corrupted file
 		return fmt.Errorf("encode video: %w", err)
 	}
 	if cfg.Benchmark {
@@ -474,10 +475,10 @@ func targetDimensions(width, height int, target string) (int, int) {
 	}
 	if width >= height {
 		scale := float64(longest) / float64(width)
-		return longest, maxInt(1, int(scale*float64(height)+0.5))
+		return longest, max(1, int(scale*float64(height)+0.5))
 	}
 	scale := float64(longest) / float64(height)
-	return maxInt(1, int(scale*float64(width)+0.5)), longest
+	return max(1, int(scale*float64(width)+0.5)), longest
 }
 
 func sanitizeBaseName(name string) string {
@@ -490,9 +491,3 @@ func sanitizeBaseName(name string) string {
 	return name
 }
 
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

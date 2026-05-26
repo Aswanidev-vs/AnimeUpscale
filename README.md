@@ -1,255 +1,144 @@
 # Anime Upscaler CLI
 
-A Go command-line tool for upscaling anime and illustration images.
+A high-performance Go command-line tool for upscaling anime, illustrations, and videos.
 
-This project currently has:
+This project packages:
+- A working **Real-ESRGAN** native backend using a project-level `bin/` + `models/` layout (highly recommended for anime).
+- A working **RealSR** native backend using a project-level `bin/` + `models/` layout.
+- A built-in, zero-dependency, pure Go fallback for quick upscale and enhancement.
+- Wrappers for `anime4kcpp`, `waifu2x`, and `realcugan` (requires installing their CLI tools separately).
 
-- a working `realesrgan` backend using project-level `bin` + `models` layout (recommended for anime)
-- a working `realsr` backend using a project-level `bin` + `models` layout
-- a built-in pure Go fallback for simple upscale and enhancement
-- optional wrappers for `anime4kcpp`, `waifu2x`, and `realcugan` if you add those tools separately
-
-## Current Status
-
-The working native backends in this workspace are:
-
-### Real-ESRGAN (Recommended)
-
-- Binary: [bin/realesrgan-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realesrgan-ncnn-vulkan.exe)
-- Models: [models/](/e:/AnimeUpscale/models/) (includes `realesr-animevideov3-x2/3/4`, `realesrgan-x4plus`, `realesrgan-x4plus-anime`)
-- Default engine for video mode
-- Optimized anime model: `realesr-animevideov3-x4`
-
-### RealSR
-
-- Binary: [bin/realsr-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realsr-ncnn-vulkan.exe)
-- Models: [models/realsr/](/e:/AnimeUpscale/models/realsr/)
-
-The project is designed so Go stays the main CLI, while native upscalers do the heavy image inference work.
+---
 
 ## Build / Install
 
-### Install (recommended)
-
-#### Install the `animeupscale` CLI
+### Recommended Install
+Compile and install the `animeupscale` CLI directly to your `%GOPATH%/bin`:
 ```powershell
 go install github.com/Aswanidev-vs/animeupscale@latest
 ```
 
-This places the compiled executable in your Go bin directory (typically `%GOPATH%\bin`).
-
-#### Install the `au` CLI alias
-This repo includes an additional entrypoint at `cmd/au`, so you can install a binary/command named `au`.
+Install the convenient `au` binary alias:
 ```powershell
 go install github.com/Aswanidev-vs/animeupscale/cmd/au@latest
 ```
 
-> After this, you should run `au.exe ...` (or `au ...` on non-Windows).
-
-### Build a local executable (optional)
+### Local Build
 ```powershell
 go build -o au.exe .
 ```
 
-## Quick Start
+---
 
-List detected engines:
+## Quick Reference & Option Examples
 
+### 1. List Available Engines
+Detect which native backends are available on your system:
 ```powershell
-go run . -list-engines
-```
-
-Upscale an image with Real-ESRGAN (recommended for anime):
-
-```powershell
-go run . -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
-```
-
-Use a different Real-ESRGAN model (photorealistic):
-
-```powershell
-go run . -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus
-```
-
-Use the built-in fallback:
-
-```powershell
-go run . -i zegion.jpg -engine builtin -target 4k
-```
-
-Upscale with `realsr`:
-
-```powershell
-go run . -i zegion.jpg -o zegion-realsr-clean-4x.jpg -engine realsr -scale 4
-```
-
-## Supported Engines
-
-- `realsr`
-  - Working in this workspace.
-  - Uses [realsr-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realsr-ncnn-vulkan.exe).
-  - Uses NCNN model files under [models/realsr](/e:/AnimeUpscale/models/realsr).
-- `builtin`
-  - Pure Go fallback.
-  - Works without external binaries.
-- `anime4kcpp`
-  - Wrapper only.
-  - Requires `ac_cli` to be installed separately.
-- `waifu2x`
-  - Wrapper only.
-  - Requires `waifu2x-ncnn-vulkan` to be installed separately.
-- `realcugan`
-  - Wrapper only.
-  - Requires `realcugan-ncnn-vulkan` to be installed separately.
-- `realesrgan`
-  - Working in this workspace.
-  - Uses [realesrgan-ncnn-vulkan.exe](/e:/AnimeUpscale/bin/realesrgan-ncnn-vulkan.exe).
-  - Bundled anime models: `realesr-animevideov3-x2`, `realesr-animevideov3-x3`, `realesr-animevideov3-x4`.
-  - Also bundles `realesrgan-x4plus` and `realesrgan-x4plus-anime`.
-  - Default engine for video mode; recommended for anime content.
-  - Use `-model-name` to select a model (default: `realesr-animevideov3`).
-  - Model path auto-detected from [models/](/e:/AnimeUpscale/models/).
-
-## CLI Usage
-
-```powershell
-au.exe -i input.png -o output.png -engine auto -scale 2
-au.exe -i input.png -o output.png -engine realsr -scale 4
-au.exe -i input.png -engine builtin -target 4k
-au.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3
 au.exe -list-engines
 ```
 
-## Anime vs Real Photos
+### 2. Upscale Images
 
-Anime quality: Best with `realesrgan` anime models (realesr-animevideov3-*), which are tuned for line-art/anime style.
-
-Real photos: Yes, it works, but quality depends on the selected engine/model:
-- Use `realesrgan-x4plus` (`-model-name realesrgan-x4plus`) for more photorealistic results.
-- Use `realsr` for another real-world SR option (photo-ish results may be decent, but less “anime-optimized” than the anime models).
-- The built-in `builtin` engine also works for photos, but it’s a simpler Go upscale/enhance and typically won’t match native-engine quality.
-
-When upscaling videos (`.mp4/.mkv/.mov/.avi/.webm`) you can enable per-stage timing with:
-
+#### Real-ESRGAN (Anime-Optimized - Recommended)
+Uses Vulkan GPU acceleration. Supports downscaling massive outputs to exact targets like `-target 4k` post-upscale to prevent absurdly large image files (e.g. upscaling a 7K image directly to 29K):
 ```powershell
-au.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 
-```
-au.exe -i input.mp4 -o output.mp4 -engine realesrgan -target 4k -scale 4 
-
-Notes:
-- Timing is printed to the terminal for these stages:
-  - `probe`
-  - `extract`
-  - `upscale`
-  - `encode/mux` (and audio mux is included when present)
-- A JSON file is written to the project root: `bench.json`
-- Video concurrency is controlled by `-video-workers` (default: `1`):
-
-```powershell
-au.exe -video -i input.mp4 -o output.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4 -video-workers 4 -benchmark
+au.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4 -target 4k
 ```
 
-### What `-benchmark` does
-- Prints elapsed time for:
-  - `probe` (ffprobe metadata parsing)
-  - `extract` (ffmpeg frame extraction)
-  - `upscale` (parallel frame upscaling)
-  - `encode/mux` (ffmpeg encoding; includes audio mux when present)
-- Writes `bench.json` to the project root.
-- The progress bar newline behavior is preserved: the progress line ends only after `stage: encode` and (when audio exists) `stage: mux audio`.
-
-### What `-video-workers` does
-- Controls the number of frames being upscaled concurrently (a bounded goroutine worker pool).
-- `1` means sequential upscale.
-- Higher values can be faster but may stress the GPU / native engine.
-
+#### RealSR (Photorealistic / Real-World Images)
+Optimized for clean real-world super-resolution (only supports `-scale 4`). Use tile sizes to manage performance and prevent VRAM out-of-memory crashes on large images:
 ```powershell
-au.exe -video -i input.mp4 -o output.mp4 -target 4k -scale 4 -engine realesrgan -model-name realesr-animevideov3-x4 -video-workers 4 
+au.exe -i nature.jpg -o nature-4x.jpg -engine realsr -scale 4 -tile-size 128
 ```
 
-## Real-ESRGAN Models
-
-The following models are bundled under [models/](/e:/AnimeUpscale/models/):
-
-| Model Name                  | Scale | Type                     | Command |
-|-----------------------------|-------|--------------------------|---------|
-| `realesr-animevideov3`      | 2     | Anime (default)          | `-scale 2 -model-name realesr-animevideov3` |
-| `realesr-animevideov3-x3`   | 3     | Anime                    | `-scale 3 -model-name realesr-animevideov3-x3` |
-| `realesr-animevideov3-x4`   | 4     | Anime (recommended)      | `-scale 4 -model-name realesr-animevideov3-x4` |
-| `realesrgan-x4plus`         | 4     | Photorealistic           | `-scale 4 -model-name realesrgan-x4plus` |
-| `realesrgan-x4plus-anime`   | 4     | Anime photorealistic 6B  | `-scale 4 -model-name realesrgan-x4plus-anime` |
-
-**Examples:**
-
+#### Built-in Engine (Pure Go Fallback)
+Works anywhere without external dependencies. Supports target presets (`2k` or `4k`):
 ```powershell
-# Anime image (default model, 2x upscale)
-au.exe -i mpeak.png -o mai.png -engine realesrgan -scale 2 -model-name realesr-animevideov3
-
-# Anime image (4x upscale)
-au.exe -i mpeak.png -o mai.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
-
-# Photorealistic image (4x upscale)
-au.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus
-
-# Anime photorealistic (4x upscale, 6B variant)
-au.exe -i zegion.jpg -o o.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus-anime
-
-# Video (4x upscale → 2K output)
-au.exe -i sky.mp4 -o sky-2k.mp4 -engine realesrgan -scale 4 -target 2k -model-name realesr-animevideov3-x4
-
-# Video (4x upscale → 4K output)
-au.exe -i sky.mp4 -o sky-4k.mp4 -engine realesrgan -scale 4 -target 4k -model-name realesr-animevideov3-x4
+au.exe -i portrait.png -o portrait-2k.png -engine builtin -target 2k -sharpen 0.25 -grayscale
 ```
 
-> **Note:** The model name is case-sensitive and must match exactly. The default model if `-model-name` is omitted is `realesr-animevideov3` (the `-x2` variant).
+---
 
-## Target Presets
+### 3. Upscale Videos
+Automatically processes videos (`.mp4`, `.mkv`, `.mov`, `.avi`, `.webm`) by extracting frames, upscaling them in parallel, and muxing audio back.
 
-The built-in engine supports:
+#### Dedicated GPU Targeting & Concurrency (Recommended)
+Integrated GPUs (like AMD Radeon CPU integrated graphics) often run out of VRAM and crash with a Vulkan `vkQueueSubmit failed -4` error. 
 
-- `-target 2k`
-  - sets the longest side to `2048`
-- `-target 4k`
-  - sets the longest side to `3840`
+Use **`-gpu`** to target your dedicated GPU (like NVIDIA GeForce GTX 1650) instead, and control concurrent threads safely:
 
-Aspect ratio is preserved automatically.
+##### Fast Anime Video Upscale (NVIDIA GPU - Highly Recommended):
+```powershell
+au.exe -video -i kbankai.mp4 -o bankai-4k.mp4 -engine realesrgan -target 4k -scale 4 -model-name realesr-animevideov3-x4 -video-workers 2 -gpu 1
+```
 
-## Output Behavior
+##### RealSR Video Upscale (High VRAM load - Use conservative settings):
+```powershell
+au.exe -video -i movie.mp4 -o movie-4k.mp4 -engine realsr -target 4k -scale 4 -video-workers 1 -gpu 1 -tile-size 128
+```
+*Note: If dedicated GPU order is mapped first, change `-gpu 1` to `-gpu 0`.*
 
-- If `-o` is omitted, the tool auto-generates an output filename beside the input.
-- If `-format` is omitted, the tool preserves the input/output extension when possible.
+---
 
-## Notes About `realsr`
+## Complete CLI Flags Options
 
-This workspace now uses a cleaner project-level layout:
+| Flag | Default | Description | Example |
+|------|---------|-------------|---------|
+| `-i`, `-input` | *None (Required)* | Path to input image or video | `-i image.png` |
+| `-o`, `-output` | *Auto-generated* | Output file path | `-o output.png` |
+| `-engine` | `realesrgan` | Engine: `auto`, `realesrgan`, `realsr`, `builtin`, `waifu2x`, `realcugan`, `anime4kcpp` | `-engine builtin` |
+| `-s`, `-scale` | `2` | Upscale scale factor (`2`, `3`, `4`) | `-scale 4` |
+| `-target` | *None* | Dimensions target: `2k` (longest side 2048px) or `4k` (3840px) | `-target 4k` |
+| `-noise` | `0` | Denoise level for waifu2x/realcugan | `-noise 2` |
+| `-gpu` | `auto` | GPU ID to use; use `-1` for CPU mode | `-gpu 0` |
+| `-model-name` | *None* | Model name to load (e.g. `realesr-animevideov3-x4`, `realesrgan-x4plus-anime`) | `-model-name realesrgan-x4plus-anime` |
+| `-tile-size` | `0` | Divide large images into tiles to save VRAM (e.g., `128`) | `-tile-size 128` |
+| `-video-workers`| `1` | Bounded goroutine worker pool size for video frame upscaling | `-video-workers 4` |
+| `-benchmark` | `false` | Enables stage timer outputs and writes `bench.json` | `-benchmark` |
+| `-sharpen` | `0.15` | Builtin-only unsharp amount (0 to disable) | `-sharpen 0.3` |
+| `-grayscale` | `false` | Builtin-only grayscale conversion before upscaling | `-grayscale` |
+| `-keep-temp` | `false` | Keep temporary extracted frame folders | `-keep-temp` |
+---
 
-- [bin](/e:/AnimeUpscale/bin)
-- [models/realsr/models-DF2K_JPEG](/e:/AnimeUpscale/models/realsr/models-DF2K_JPEG)
+## Tile Size Guide (`-tile-size`)
 
-The native binary still expects model directory names compatible with its own logic, so the Go code points it to the compatible nested model folder automatically.
+When upscaling, the native engine loads the entire image into GPU VRAM by default (`-tile-size 0`). For large images or limited GPUs, this causes **Vulkan out-of-memory crashes** (`vkQueueSubmit failed -4`).
 
-## Project Structure
+Setting `-tile-size` splits the image into square blocks of that pixel size, processes them one at a time, and stitches the result back together. Smaller tiles use less VRAM but run slightly slower.
 
-- [main.go](/e:/AnimeUpscale/main.go)
-  - entrypoint
-- [internal/cli](/e:/AnimeUpscale/internal/cli)
-  - CLI parsing and request building
-- [internal/upscale](/e:/AnimeUpscale/internal/upscale)
-  - engine selection and backend integration
-- [internal/nativeexec](/e:/AnimeUpscale/internal/nativeexec)
-  - native execution bridge, including the Windows `cgo` runner
+### Recommended Tile Sizes by GPU VRAM
 
-## Example Result
+| GPU VRAM | Tile Size | Notes |
+|----------|-----------|-------|
+| **2 GB** (integrated / low-end) | `64` – `128` | Safe but slow. Use `-video-workers 1`. |
+| **4 GB** (GTX 1650, RX 580) | `128` – `256` | Good balance of speed and stability. |
+| **6 GB** (RTX 2060, RTX 3060) | `256` – `400` | Fast. Can try `-video-workers 2`. |
+| **8 GB+** (RTX 3070+, RTX 4070+) | `400` – `0` | Use `0` (no tiling) for max speed. |
 
-Generated from the current workspace:
+### How to Choose
 
-- [zegion-realsr-clean-4x.jpg](zegion_upscale-4k.png)
+1. **Start with `0`** (no tiling). If it works, you get maximum speed.
+2. **If you see `vkQueueSubmit failed`**, set `-tile-size 256` and retry.
+3. **Still crashing?** Lower to `128` or `64`.
+4. **Multiple workers?** Each worker uses its own tile buffer. With `-video-workers 2`, halve your tile size (e.g., use `128` instead of `256`).
 
+### Examples
 
-## References
+```powershell
+# 4GB GPU, single image, safe tile size
+au.exe -i photo.jpg -o photo-4x.png -engine realsr -scale 4 -tile-size 128
 
-- RealSR NCNN Vulkan: https://github.com/nihui/realsr-ncnn-vulkan
-- Anime4KCPP: https://github.com/TianZerL/Anime4KCPP
-- waifu2x NCNN Vulkan: https://github.com/nihui/waifu2x-ncnn-vulkan
-- RealCUGAN NCNN Vulkan: https://github.com/nihui/realcugan-ncnn-vulkan
-- Real-ESRGAN NCNN Vulkan: https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan
+# 6GB GPU, video with 2 workers
+au.exe -video -i clip.mp4 -o clip-4k.mp4 -engine realesrgan -target 4k -scale 4 -model-name realesr-animevideov3-x4 -video-workers 2 -tile-size 256
+
+# 8GB+ GPU, no tiling needed
+au.exe -i wallpaper.png -o wallpaper-4x.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
+```
+
+---
+
+## Performance & Safety Optimizations
+- **Fast Path Resolution Caching**: Eliminates redundant disk scans during video upscaling, reducing upscaling overhead on large files.
+- **Corrupt File Protection**: If upscaling or ffmpeg encode fails, temporary/partial outputs are cleaned up automatically so your final file is never left half-written or corrupted.
+- **Bounded Concurrency**: Controls memory and GPU overhead using `-video-workers`.

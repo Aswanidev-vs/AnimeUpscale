@@ -64,6 +64,17 @@ func (e externalEngine) Upscale(req Request) (Result, error) {
 		outBounds = image.Rect(0, 0, inBounds.Dx()*req.Scale, inBounds.Dy()*req.Scale)
 	}
 
+	// If a target size is requested, exact resize the upscaled output to match the target presets (2k/4k)
+	if req.TargetW > 0 && req.TargetH > 0 && (outBounds.Dx() != req.TargetW || outBounds.Dy() != req.TargetH) {
+		src, _, err := decodeImage(req.Output)
+		if err == nil {
+			resized := BilinearResize(src, req.TargetW, req.TargetH)
+			if err := encodeImage(req.Output, req.Format, resized); err == nil {
+				outBounds = resized.Bounds()
+			}
+		}
+	}
+
 	return Result{
 		Engine:       e.name,
 		Output:       req.Output,
@@ -116,8 +127,8 @@ func NewRealESRGANEngine() Engine {
 
 			modelPath := req.ModelPath
 			modelName := req.ModelName
-			_, repoModels, _, _ := locateRealESRGAN()
 			if modelPath == "" {
+				_, repoModels, _, _ := locateRealESRGAN()
 				modelPath = repoModels
 			}
 			if modelName == "" {
@@ -170,12 +181,13 @@ func NewRealSREngine() Engine {
 		builder: func(req Request, _ string) []string {
 			scale := req.Scale
 			if scale != 4 {
+				fmt.Printf("[Warning] realsr engine only supports scale 4. Forcing scale to 4.\n")
 				scale = 4
 			}
 
 			modelPath := req.ModelPath
-			_, repoModels, _, _ := locateRealSR()
 			if modelPath == "" {
+				_, repoModels, _, _ := locateRealSR()
 				modelPath = repoModels
 			}
 
@@ -301,7 +313,23 @@ func normalizeExternalFormat(format string) string {
 	}
 }
 
+var (
+	cacheESRGANModelPath string
+	cacheESRGANBinary    string
+	cacheSRModelPath     string
+	cacheSRBinary        string
+)
+
 func locateRealESRGAN() (binaryPath, modelPath string, ok bool, detail string) {
+	if cacheESRGANBinary != "" || cacheESRGANModelPath != "" {
+		return cacheESRGANBinary, cacheESRGANModelPath, true, "cached"
+	}
+	defer func() {
+		if ok {
+			cacheESRGANBinary = binaryPath
+			cacheESRGANModelPath = modelPath
+		}
+	}()
 	for _, candidate := range []string{"realesrgan-ncnn-vulkan.exe", "realesrgan-ncnn-vulkan"} {
 		if path, err := exec.LookPath(candidate); err == nil {
 			return path, findRealESRGANModels("."), true, "PATH"
@@ -343,6 +371,15 @@ func locateRealESRGAN() (binaryPath, modelPath string, ok bool, detail string) {
 }
 
 func locateRealSR() (binaryPath, modelPath string, ok bool, detail string) {
+	if cacheSRBinary != "" || cacheSRModelPath != "" {
+		return cacheSRBinary, cacheSRModelPath, true, "cached"
+	}
+	defer func() {
+		if ok {
+			cacheSRBinary = binaryPath
+			cacheSRModelPath = modelPath
+		}
+	}()
 	for _, candidate := range []string{"realsr-ncnn-vulkan.exe", "realsr-ncnn-vulkan"} {
 		if path, err := exec.LookPath(candidate); err == nil {
 			return path, findRealSRModels("."), true, "PATH"

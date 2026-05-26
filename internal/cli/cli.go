@@ -148,8 +148,6 @@ func Run(args []string) error {
 		engine := strings.ToLower(cfg.Engine)
 		if engine == "auto" {
 			cfg.Engine = "builtin"
-		} else if engine != "builtin" {
-			return errors.New("target presets currently require -engine builtin for exact 2k/4k sizing")
 		}
 	}
 
@@ -272,18 +270,11 @@ func targetFromLongestSide(path string, longestSide int) (int, int, error) {
 
 	if cfg.Width >= cfg.Height {
 		scale := float64(longestSide) / float64(cfg.Width)
-		return longestSide, maxInt(1, int(scale*float64(cfg.Height)+0.5)), nil
+		return longestSide, max(1, int(scale*float64(cfg.Height)+0.5)), nil
 	}
 
 	scale := float64(longestSide) / float64(cfg.Height)
-	return maxInt(1, int(scale*float64(cfg.Width)+0.5)), longestSide, nil
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	return max(1, int(scale*float64(cfg.Width)+0.5)), longestSide, nil
 }
 
 func resolveOutputPath(inputPath, outputPath, target, format string) (string, error) {

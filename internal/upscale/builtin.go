@@ -55,7 +55,7 @@ func (builtinEngine) Upscale(req Request) (Result, error) {
 
 func scaleImage(src *image.NRGBA, scale, targetW, targetH int) *image.NRGBA {
 	if targetW > 0 && targetH > 0 {
-		return bilinearResize(src, targetW, targetH)
+		return BilinearResize(src, targetW, targetH)
 	}
 	return bilinearScale(src, scale)
 }
@@ -86,25 +86,32 @@ func encodeImage(path, format string, img image.Image) error {
 	if err != nil {
 		return fmt.Errorf("create output: %w", err)
 	}
-	defer f.Close()
 
+	var encodeErr error
 	switch format {
 	case "jpg", "jpeg":
-		return jpeg.Encode(f, img, &jpeg.Options{Quality: 95})
+		encodeErr = jpeg.Encode(f, img, &jpeg.Options{Quality: 95})
 	default:
-		return png.Encode(f, img)
+		encodeErr = png.Encode(f, img)
 	}
+
+	f.Close()
+	if encodeErr != nil {
+		_ = os.Remove(path) // prevent corrupted file
+		return fmt.Errorf("encode output: %w", encodeErr)
+	}
+	return nil
 }
 
 func bilinearScale(src *image.NRGBA, scale int) *image.NRGBA {
 	if scale <= 1 {
-		return bilinearResize(src, src.Bounds().Dx(), src.Bounds().Dy())
+		return BilinearResize(src, src.Bounds().Dx(), src.Bounds().Dy())
 	}
 	srcB := src.Bounds()
-	return bilinearResize(src, srcB.Dx()*scale, srcB.Dy()*scale)
+	return BilinearResize(src, srcB.Dx()*scale, srcB.Dy()*scale)
 }
 
-func bilinearResize(src *image.NRGBA, dstW, dstH int) *image.NRGBA {
+func BilinearResize(src *image.NRGBA, dstW, dstH int) *image.NRGBA {
 	if dstW <= 0 || dstH <= 0 {
 		dstW = src.Bounds().Dx()
 		dstH = src.Bounds().Dy()
@@ -249,16 +256,3 @@ func minFloat(a, b float64) float64 {
 	return b
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
