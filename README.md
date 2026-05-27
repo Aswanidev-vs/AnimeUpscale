@@ -49,7 +49,11 @@ au.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name reales
 #### RealSR (Photorealistic / Real-World Images)
 Optimized for clean real-world super-resolution (only supports `-scale 4`). Use tile sizes to manage performance and prevent VRAM out-of-memory crashes on large images:
 ```powershell
+# Upscale using default denoised model (models-DF2K_JPEG) for compressed images
 au.exe -i nature.jpg -o nature-4x.jpg -engine realsr -scale 4 -tile-size 128
+
+# Upscale using clean model (models-DF2K) for clean/high-quality photos
+au.exe -i nature.jpg -o nature-4x.jpg -engine realsr -scale 4 -model-name DF2K -tile-size 128
 ```
 
 #### Built-in Engine (Pure Go Fallback)
@@ -92,7 +96,7 @@ au.exe -video -i movie.mp4 -o movie-4k.mp4 -engine realsr -target 4k -scale 4 -v
 | `-target` | *None* | Dimensions target: `2k` (longest side 2048px) or `4k` (3840px) | `-target 4k` |
 | `-noise` | `0` | Denoise level for waifu2x/realcugan | `-noise 2` |
 | `-gpu` | `auto` | GPU ID to use; use `-1` for CPU mode | `-gpu 0` |
-| `-model-name` | *None* | Model name to load (e.g. `realesr-animevideov3-x4`, `realesrgan-x4plus-anime`) | `-model-name realesrgan-x4plus-anime` |
+| `-model-name` | *None* | Model name (realesrgan: `realesr-animevideov3` (default), `realesrgan-x4plus-anime`, `realesrgan-x4plus`; realsr: `DF2K_JPEG` (default), `DF2K`) | `-model-name realesrgan-x4plus-anime` |
 | `-tile-size` | `0` | Divide large images into tiles to save VRAM (e.g., `128`) | `-tile-size 128` |
 | `-video-workers`| `1` | Bounded goroutine worker pool size for video frame upscaling | `-video-workers 4` |
 | `-benchmark` | `false` | Enables stage timer outputs and writes `bench.json` | `-benchmark` |

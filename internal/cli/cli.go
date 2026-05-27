@@ -61,7 +61,7 @@ func Run(args []string) error {
 	fs.IntVar(&cfg.TileSize, "tile-size", 0, "tile size for supported external engines")
 	fs.StringVar(&cfg.GPUID, "gpu", "auto", "gpu id for supported external engines; use -1 for cpu")
 	fs.StringVar(&cfg.ModelPath, "model-path", "", "optional external model directory")
-	fs.StringVar(&cfg.ModelName, "model-name", "", "external model name (for realesrgan: realesr-animevideov3 for anime)")
+	fs.StringVar(&cfg.ModelName, "model-name", "", "model name (realesrgan: realesr-animevideov3|realesrgan-x4plus-anime|realesrgan-x4plus; realsr: DF2K|DF2K_JPEG)")
 	fs.StringVar(&cfg.Threads, "threads", "", "optional external thread tuple such as 1:2:2")
 	fs.BoolVar(&cfg.TTA, "tta", false, "enable tta mode for supported external engines")
 	fs.BoolVar(&cfg.List, "list-engines", false, "list detected engines")
@@ -74,16 +74,17 @@ func Run(args []string) error {
 	fs.StringVar(&cfg.VideoCodec, "video-codec", "libx264", "video codec for video mode")
 	fs.IntVar(&cfg.VideoWorkers, "video-workers", 1, "number of parallel upscaling workers for video mode (1 = sequential)")
 	fs.BoolVar(&cfg.Benchmark, "benchmark", false, "print per-stage timings and write benchmark JSON (bench.json)")
-
+ 
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Anime image upscaler CLI")
 		fmt.Fprintln(fs.Output(), "")
 		fmt.Fprintln(fs.Output(), "Examples:")
 		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine auto -scale 2")
-		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realsr -scale 4")
+		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realsr -scale 4 -model-name DF2K")
 		fmt.Fprintln(fs.Output(), "  au -i in.png -o out-4k.png -engine builtin -target 4k")
 		fmt.Fprintln(fs.Output(), "  au -video -i in.mp4 -o out.mp4 -engine realsr -target 4k")
 		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realesrgan -scale 4 -model-name realesr-animevideov3")
+		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus-anime")
 		fmt.Fprintln(fs.Output(), "  au -i frame.jpg -o frame@4x.png -engine waifu2x -scale 4 -noise 2")
 		fmt.Fprintln(fs.Output(), "  au -list-engines")
 		fmt.Fprintln(fs.Output(), "")

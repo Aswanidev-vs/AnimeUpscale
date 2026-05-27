@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/Aswanidev-vs/animeupscale/internal/nativeexec"
 )
@@ -149,6 +150,9 @@ func NewRealESRGANEngine() Engine {
 				"-f", normalizeExternalFormat(req.Format),
 			}
 			if modelPath != "" {
+				if abs, err := filepath.Abs(modelPath); err == nil {
+					modelPath = abs
+				}
 				args = append(args, "-m", modelPath)
 			}
 			if modelName != "" {
@@ -187,8 +191,19 @@ func NewRealSREngine() Engine {
 
 			modelPath := req.ModelPath
 			if modelPath == "" {
-				_, repoModels, _, _ := locateRealSR()
-				modelPath = repoModels
+				if req.ModelName != "" {
+					bin, _, ok, _ := locateRealSR()
+					if ok {
+						modelPath = findRealSRModels(filepath.Dir(bin), req.ModelName)
+						if modelPath == "" {
+							modelPath = findRealSRModels(".", req.ModelName)
+						}
+					}
+				}
+				if modelPath == "" {
+					_, repoModels, _, _ := locateRealSR()
+					modelPath = repoModels
+				}
 			}
 
 			args := []string{
@@ -198,6 +213,9 @@ func NewRealSREngine() Engine {
 				"-f", normalizeExternalFormat(req.Format),
 			}
 			if modelPath != "" {
+				if abs, err := filepath.Abs(modelPath); err == nil {
+					modelPath = abs
+				}
 				args = append(args, "-m", modelPath)
 			}
 			if req.TileSize > 0 {
@@ -253,7 +271,11 @@ func NewWaifu2xEngine() Engine {
 				args = append(args, "-t", strconv.Itoa(req.TileSize))
 			}
 			if req.ModelPath != "" {
-				args = append(args, "-m", req.ModelPath)
+				modelPath := req.ModelPath
+				if abs, err := filepath.Abs(modelPath); err == nil {
+					modelPath = abs
+				}
+				args = append(args, "-m", modelPath)
 			}
 			if req.GPUID != "" && req.GPUID != "auto" {
 				args = append(args, "-g", req.GPUID)
@@ -286,7 +308,11 @@ func NewRealCUGANEngine() Engine {
 				args = append(args, "-t", strconv.Itoa(req.TileSize))
 			}
 			if req.ModelPath != "" {
-				args = append(args, "-m", req.ModelPath)
+				modelPath := req.ModelPath
+				if abs, err := filepath.Abs(modelPath); err == nil {
+					modelPath = abs
+				}
+				args = append(args, "-m", modelPath)
 			}
 			if req.GPUID != "" && req.GPUID != "auto" {
 				args = append(args, "-g", req.GPUID)
@@ -382,7 +408,7 @@ func locateRealSR() (binaryPath, modelPath string, ok bool, detail string) {
 	}()
 	for _, candidate := range []string{"realsr-ncnn-vulkan.exe", "realsr-ncnn-vulkan"} {
 		if path, err := exec.LookPath(candidate); err == nil {
-			return path, findRealSRModels("."), true, "PATH"
+			return path, findRealSRModels(".", ""), true, "PATH"
 		}
 	}
 
@@ -394,16 +420,16 @@ func locateRealSR() (binaryPath, modelPath string, ok bool, detail string) {
 		for _, name := range []string{"realsr-ncnn-vulkan.exe", "realsr-ncnn-vulkan"} {
 			path := filepath.Clean(filepath.Join(root, name))
 			if fileExists(path) {
-				model := findRealSRModels(root)
+				model := findRealSRModels(root, "")
 				if model == "" {
-					model = findRealSRModels(".")
+					model = findRealSRModels(".", "")
 				}
 				return path, model, true, "workspace"
 			}
 		}
 	}
 
-	model := findRealSRModels(".")
+	model := findRealSRModels(".", "")
 	if model != "" {
 		return "", model, false, "models found but executable is missing"
 	}
@@ -426,22 +452,38 @@ func findRealESRGANModels(root string) string {
 	return ""
 }
 
-func findRealSRModels(root string) string {
-	candidates := []string{
-		filepath.Join(root, "models", "realsr", "models-DF2K_JPEG"),
-		filepath.Join(root, "models", "realsr", "models-DF2K"),
-		filepath.Join(root, "models", "models-DF2K_JPEG"),
-		filepath.Join(root, "models", "models-DF2K"),
-		filepath.Join(root, "models-DF2K_JPEG"),
-		filepath.Join(root, "models-DF2K"),
-		filepath.Join(root, "realsr", "models-DF2K_JPEG"),
-		filepath.Join(root, "realsr", "models-DF2K"),
-		filepath.Join(root, "models", "realsr", "models-DF2K_JPEG"),
-		filepath.Join(root, "models", "realsr", "models-DF2K"),
-		filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models", "models-DF2K_JPEG"),
-		filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models", "models-DF2K"),
-		filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models-DF2K_JPEG"),
-		filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models-DF2K"),
+func findRealSRModels(root string, modelName string) string {
+	var candidates []string
+	if modelName != "" {
+		name := modelName
+		if !strings.HasPrefix(name, "models-") {
+			name = "models-" + name
+		}
+		candidates = []string{
+			filepath.Join(root, "models", "realsr", name),
+			filepath.Join(root, "models", name),
+			filepath.Join(root, name),
+			filepath.Join(root, "realsr", name),
+			filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models", name),
+			filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", name),
+		}
+	} else {
+		candidates = []string{
+			filepath.Join(root, "models", "realsr", "models-DF2K_JPEG"),
+			filepath.Join(root, "models", "realsr", "models-DF2K"),
+			filepath.Join(root, "models", "models-DF2K_JPEG"),
+			filepath.Join(root, "models", "models-DF2K"),
+			filepath.Join(root, "models-DF2K_JPEG"),
+			filepath.Join(root, "models-DF2K"),
+			filepath.Join(root, "realsr", "models-DF2K_JPEG"),
+			filepath.Join(root, "realsr", "models-DF2K"),
+			filepath.Join(root, "models", "realsr", "models-DF2K_JPEG"),
+			filepath.Join(root, "models", "realsr", "models-DF2K"),
+			filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models", "models-DF2K_JPEG"),
+			filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models", "models-DF2K"),
+			filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models-DF2K_JPEG"),
+			filepath.Join(root, "realsr-ncnn-vulkan-20220728-windows", "models-DF2K"),
+		}
 	}
 	for _, dir := range candidates {
 		if realSRModelDir(dir) {
