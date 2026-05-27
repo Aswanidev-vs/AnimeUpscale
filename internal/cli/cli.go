@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Aswanidev-vs/animeupscale/internal/progress"
 	"github.com/Aswanidev-vs/animeupscale/internal/upscale"
 	"github.com/Aswanidev-vs/animeupscale/internal/video"
 )
@@ -181,7 +182,10 @@ func Run(args []string) error {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 
+	spinner := progress.NewSpinner("stage: upscale")
+	spinner.Start()
 	result, err := manager.Upscale(req)
+	spinner.Stop()
 	if err != nil {
 		return err
 	}

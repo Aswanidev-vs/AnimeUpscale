@@ -10,6 +10,101 @@ This project packages:
 
 ---
 
+## Prerequisites
+
+Before using Anime Upscaler, make sure the following are installed on your system.
+
+### 1. Go (Required for building)
+
+**Check:**
+```powershell
+go version
+# Expected: go version go1.21+ windows/amd64
+```
+
+**Install:** Download from [https://go.dev/dl/](https://go.dev/dl/) and run the installer. Restart your terminal after install.
+
+---
+
+### 2. FFmpeg & FFprobe (Required for video mode)
+
+These are needed **only** for video upscaling (`-video` flag). Image-only upscaling does not need them.
+
+**Check:**
+```powershell
+ffmpeg -version
+ffprobe -version
+# Both should print version info if installed
+```
+
+**Install (Windows — pick one):**
+
+**Option A — winget (recommended):**
+```powershell
+winget install --id Gyan.FFmpeg -e --source winget
+```
+
+**Option B — scoop:**
+```powershell
+scoop install ffmpeg
+```
+
+**Option C — Manual:**
+1. Download from [https://www.gyan.dev/ffmpeg/builds/](https://www.gyan.dev/ffmpeg/builds/) (get the `ffmpeg-release-essentials.zip`)
+2. Extract to a folder (e.g. `C:\ffmpeg`)
+3. Add `C:\ffmpeg\bin` to your system PATH:
+   ```powershell
+   # Verify after adding to PATH:
+   ffmpeg -version
+   ```
+
+> **Note:** The CLI checks for ffmpeg/ffprobe in your global PATH first. If not found, it falls back to checking `./bin/` and current directory.
+
+---
+
+### 3. Vulkan-Compatible GPU (Required for native engines)
+
+Real-ESRGAN, RealSR, waifu2x, and realcugan all use Vulkan GPU acceleration.
+
+**Check:**
+```powershell
+# List detected GPUs when running any upscale:
+au.exe -list-engines
+# Should show available engines with GPU info
+```
+
+**Requirements:**
+- NVIDIA: Install latest [GeForce drivers](https://www.nvidia.com/download/index.aspx)
+- AMD: Install latest [Adrenalin drivers](https://www.amd.com/en/support)
+- Intel: Install latest [Arc/UHD drivers](https://www.intel.com/content/www/us/en/download-center/home.html)
+
+> **Tip:** If you have dual GPUs (e.g. integrated AMD + dedicated NVIDIA), use `-gpu 1` to target the dedicated GPU and avoid integrated GPU VRAM crashes.
+
+---
+
+### 4. Upscaling Engine Binaries (At least one required)
+
+The CLI auto-detects engines from `./bin/`, `./models/`, or your PATH.
+
+| Engine | Binary | Where to get |
+|--------|--------|-------------|
+| **Real-ESRGAN** (recommended) | `realesrgan-ncnn-vulkan.exe` | [GitHub Releases](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/releases) |
+| **RealSR** | `realsr-ncnn-vulkan.exe` | [GitHub Releases](https://github.com/nihui/realsr-ncnn-vulkan/releases) |
+| **waifu2x** | `waifu2x-ncnn-vulkan.exe` | [GitHub Releases](https://github.com/nihui/waifu2x-ncnn-vulkan/releases) |
+| **realcugan** | `realcugan-ncnn-vulkan.exe` | [GitHub Releases](https://github.com/nihui/realcugan-ncnn-vulkan/releases) |
+| **Anime4KCPP** | `ac_cli.exe` | [GitHub Releases](https://github.com/TianZerL/Anime4KCPP/releases) |
+| **Built-in** | *None needed* | Pure Go — always available |
+
+**Quick setup:** Place the engine `.exe` and its `models/` folder in `./bin/` next to `au.exe`, or add them to your system PATH.
+
+**Verify engines detected:**
+```powershell
+au.exe -list-engines
+# Shows all detected engines and their paths
+```
+
+---
+
 ## Build / Install
 
 ### Recommended Install
@@ -43,7 +138,7 @@ au.exe -list-engines
 #### Real-ESRGAN (Anime-Optimized - Recommended)
 Uses Vulkan GPU acceleration. Supports downscaling massive outputs to exact targets like `-target 4k` post-upscale to prevent absurdly large image files (e.g. upscaling a 7K image directly to 29K):
 ```powershell
-au.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4 -target 4k
+au.exe -i input.png -o output.png -engine realesrgan -scale 4 -model-name realesr-animevideov3 -target 4k
 ```
 
 #### RealSR (Photorealistic / Real-World Images)
@@ -134,10 +229,10 @@ Setting `-tile-size` splits the image into square blocks of that pixel size, pro
 au.exe -i photo.jpg -o photo-4x.png -engine realsr -scale 4 -tile-size 128
 
 # 6GB GPU, video with 2 workers
-au.exe -video -i clip.mp4 -o clip-4k.mp4 -engine realesrgan -target 4k -scale 4 -model-name realesr-animevideov3-x4 -video-workers 2 -tile-size 256
+au.exe -video -i clip.mp4 -o clip-4k.mp4 -engine realesrgan -target 4k -scale 4 -model-name realesr-animevideov3 -video-workers 2 -tile-size 256
 
 # 8GB+ GPU, no tiling needed
-au.exe -i wallpaper.png -o wallpaper-4x.png -engine realesrgan -scale 4 -model-name realesr-animevideov3-x4
+au.exe -i wallpaper.png -o wallpaper-4x.png -engine realesrgan -scale 4 -model-name realesr-animevideov3
 ```
 
 ---

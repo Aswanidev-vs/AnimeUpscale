@@ -117,7 +117,7 @@ func NewRealESRGANEngine() Engine {
 		locate:   locateRealESRGAN,
 		// Omit runner to use default exec.Command, avoiding
 		// CWD issues when the binary is in a subdirectory like bin/
-		builder: func(req Request, _ string) []string {
+		builder: func(req Request, binary string) []string {
 			scale := req.Scale
 			if scale < 2 {
 				scale = 2
@@ -151,7 +151,11 @@ func NewRealESRGANEngine() Engine {
 			}
 			if modelPath != "" {
 				if abs, err := filepath.Abs(modelPath); err == nil {
-					modelPath = abs
+					if rel, err := filepath.Rel(filepath.Dir(binary), abs); err == nil {
+						modelPath = rel
+					} else {
+						modelPath = abs
+					}
 				}
 				args = append(args, "-m", modelPath)
 			}
@@ -182,7 +186,7 @@ func NewRealSREngine() Engine {
 		note:     "wrapped RealSR ncnn Vulkan engine via cgo runner",
 		locate:   locateRealSR,
 		runner:   nativeexec.Run,
-		builder: func(req Request, _ string) []string {
+		builder: func(req Request, binary string) []string {
 			scale := req.Scale
 			if scale != 4 {
 				fmt.Printf("[Warning] realsr engine only supports scale 4. Forcing scale to 4.\n")
@@ -214,7 +218,11 @@ func NewRealSREngine() Engine {
 			}
 			if modelPath != "" {
 				if abs, err := filepath.Abs(modelPath); err == nil {
-					modelPath = abs
+					if rel, err := filepath.Rel(filepath.Dir(binary), abs); err == nil {
+						modelPath = rel
+					} else {
+						modelPath = abs
+					}
 				}
 				args = append(args, "-m", modelPath)
 			}
@@ -259,7 +267,7 @@ func NewWaifu2xEngine() Engine {
 		name:     "waifu2x",
 		binaries: []string{"waifu2x-ncnn-vulkan.exe", "waifu2x-ncnn-vulkan"},
 		note:     "wrapped external waifu2x-ncnn-vulkan",
-		builder: func(req Request, _ string) []string {
+		builder: func(req Request, binary string) []string {
 			args := []string{
 				"-i", req.Input,
 				"-o", req.Output,
@@ -273,7 +281,11 @@ func NewWaifu2xEngine() Engine {
 			if req.ModelPath != "" {
 				modelPath := req.ModelPath
 				if abs, err := filepath.Abs(modelPath); err == nil {
-					modelPath = abs
+					if rel, err := filepath.Rel(filepath.Dir(binary), abs); err == nil {
+						modelPath = rel
+					} else {
+						modelPath = abs
+					}
 				}
 				args = append(args, "-m", modelPath)
 			}
@@ -296,7 +308,7 @@ func NewRealCUGANEngine() Engine {
 		name:     "realcugan",
 		binaries: []string{"realcugan-ncnn-vulkan.exe", "realcugan-ncnn-vulkan"},
 		note:     "wrapped external realcugan-ncnn-vulkan",
-		builder: func(req Request, _ string) []string {
+		builder: func(req Request, binary string) []string {
 			args := []string{
 				"-i", req.Input,
 				"-o", req.Output,
@@ -310,7 +322,11 @@ func NewRealCUGANEngine() Engine {
 			if req.ModelPath != "" {
 				modelPath := req.ModelPath
 				if abs, err := filepath.Abs(modelPath); err == nil {
-					modelPath = abs
+					if rel, err := filepath.Rel(filepath.Dir(binary), abs); err == nil {
+						modelPath = rel
+					} else {
+						modelPath = abs
+					}
 				}
 				args = append(args, "-m", modelPath)
 			}

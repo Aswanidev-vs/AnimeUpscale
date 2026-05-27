@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Aswanidev-vs/animeupscale/internal/progress"
 	"github.com/Aswanidev-vs/animeupscale/internal/upscale"
 )
 
@@ -94,8 +95,10 @@ func (p *Processor) Process(cfg Config) error {
 	}
 
 	stages := map[string]any{}
-	fmt.Println("stage: probe")
+	probeSpinner := progress.NewSpinner("stage: probe")
+	probeSpinner.Start()
 	info, err := probeVideo(cfg.Input)
+	probeSpinner.Stop()
 	if err != nil {
 		return err
 	}
@@ -176,9 +179,12 @@ func (p *Processor) Process(cfg Config) error {
 	if cfg.Benchmark {
 		extractStart = time.Now()
 	}
-	fmt.Println("stage: extract")
+	extractSpinner := progress.NewSpinner("stage: extract")
+	extractSpinner.Start()
 	framePattern := filepath.Join(framesDir, "frame_%06d.png")
-	if err := runFFmpeg("-y", "-i", cfg.Input, framePattern); err != nil {
+	err = runFFmpeg("-y", "-i", cfg.Input, framePattern)
+	extractSpinner.Stop()
+	if err != nil {
 		return fmt.Errorf("extract frames: %w", err)
 	}
 	if cfg.Benchmark {
@@ -250,19 +256,21 @@ func (p *Processor) Process(cfg Config) error {
 	}
 
 	progressBar := func(done, total int) {
-		width := 30
+		width := 20
 		p := float64(done) / float64(total)
 		filled := int(p * float64(width))
 		if filled > width {
 			filled = width
 		}
 		empty := width - filled
+		filledStr := repeatRune('█', filled)
+		emptyStr := repeatRune('░', empty)
 		// carriage return so it updates in-place
 		// IMPORTANT: do NOT print newline when upscale reaches 100%.
 		// The newline should only happen after:
 		//   stage: encode
 		//   stage: mux audio
-		fmt.Printf("\r[%s%s] %3d/%d (%.1f%%)", strings.Repeat("=", filled), strings.Repeat(" ", empty), done, total, p*100)
+		fmt.Printf("\r[%s%s] %3d/%d (%.1f%%)", filledStr, emptyStr, done, total, p*100)
 	}
 
 	finishProgress := func() {
@@ -341,9 +349,9 @@ func (p *Processor) Process(cfg Config) error {
 		fmt.Printf("benchmark: upscale %.3fs\n", stages["upscale_seconds"].(float64))
 	}
 
-	// Upscale is complete; show final 100% but keep progress bar line “open”
-	// until encode + mux finish.
+	// Upscale is complete; show final 100% and finalize the line
 	progressBar(total, total)
+	finishProgress()
 
 	targetW, targetH := targetDimensions(info.Width*cfg.Scale, info.Height*cfg.Scale, cfg.Target)
 	fps := cfg.FPS
@@ -362,7 +370,14 @@ func (p *Processor) Process(cfg Config) error {
 	if cfg.Benchmark {
 		encodeStart = time.Now()
 	}
-	fmt.Println("stage: encode")
+
+	stageMsg := "stage: encode"
+	if info.HasAudio {
+		stageMsg = "stage: encode & mux audio"
+	}
+	encodeSpinner := progress.NewSpinner(stageMsg)
+	encodeSpinner.Start()
+
 	upscaledPattern := filepath.Join(upscaledDir, "frame_%06d.png")
 	args := []string{
 		"-y",
@@ -375,30 +390,37 @@ func (p *Processor) Process(cfg Config) error {
 		"-map", "0:v:0",
 	}
 	if info.HasAudio {
-		fmt.Println("stage: mux audio")
 		args = append(args, "-map", "1:a?", "-c:a", "copy", "-shortest")
 	}
 	args = append(args, cfg.Output)
-	if err := runFFmpeg(args...); err != nil {
+	err = runFFmpeg(args...)
+	encodeSpinner.Stop()
+
+	if err != nil {
 		_ = os.Remove(cfg.Output) // prevent corrupted file
 		return fmt.Errorf("encode video: %w", err)
 	}
 	if cfg.Benchmark {
-		// include mux audio inside the encode ffmpeg call when audio exists
 		stages["encode_seconds"] = time.Since(encodeStart).Seconds()
-
 		fmt.Printf("benchmark: encode/mux %.3fs\n", stages["encode_seconds"].(float64))
 	}
-
-	// encode finished (and mux audio stage may have run above)
-	finishProgress()
 
 	success = true
 	return nil
 }
 
+var (
+	resolvedFFmpeg  = "ffmpeg"
+	resolvedFFprobe = "ffprobe"
+)
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 func probeVideo(path string) (videoInfo, error) {
-	cmd := exec.Command("ffprobe", "-v", "error", "-show_streams", "-of", "json", path)
+	cmd := exec.Command(resolvedFFprobe, "-v", "error", "-show_streams", "-of", "json", path)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -451,7 +473,7 @@ func normalizeFPS(raw string) string {
 }
 
 func runFFmpeg(args ...string) error {
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(resolvedFFmpeg, args...)
 	var stderr bytes.Buffer
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = &stderr
@@ -462,10 +484,53 @@ func runFFmpeg(args ...string) error {
 }
 
 func requireBinary(name string) error {
-	if _, err := exec.LookPath(name); err != nil {
-		return fmt.Errorf("%s is required but was not found in PATH", name)
+	if name == "ffmpeg" {
+		if resolvedFFmpeg != "ffmpeg" {
+			return nil
+		}
+		if path, err := exec.LookPath("ffmpeg"); err == nil {
+			resolvedFFmpeg = path
+			return nil
+		}
+		candidates := []string{
+			filepath.Join("bin", "ffmpeg.exe"),
+			filepath.Join("bin", "ffmpeg"),
+			"ffmpeg.exe",
+			"ffmpeg",
+		}
+		for _, c := range candidates {
+			if fileExists(c) {
+				resolvedFFmpeg, _ = filepath.Abs(c)
+				return nil
+			}
+		}
+		return fmt.Errorf("ffmpeg is required but was not found in PATH or local directory")
 	}
-	return nil
+
+	if name == "ffprobe" {
+		if resolvedFFprobe != "ffprobe" {
+			return nil
+		}
+		if path, err := exec.LookPath("ffprobe"); err == nil {
+			resolvedFFprobe = path
+			return nil
+		}
+		candidates := []string{
+			filepath.Join("bin", "ffprobe.exe"),
+			filepath.Join("bin", "ffprobe"),
+			"ffprobe.exe",
+			"ffprobe",
+		}
+		for _, c := range candidates {
+			if fileExists(c) {
+				resolvedFFprobe, _ = filepath.Abs(c)
+				return nil
+			}
+		}
+		return fmt.Errorf("ffprobe is required but was not found in PATH or local directory")
+	}
+
+	return fmt.Errorf("unknown binary check: %s", name)
 }
 
 func targetDimensions(width, height int, target string) (int, int) {
@@ -489,5 +554,16 @@ func sanitizeBaseName(name string) string {
 		return "video_job"
 	}
 	return name
+}
+
+func repeatRune(r rune, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	buf := make([]rune, n)
+	for i := range buf {
+		buf[i] = r
+	}
+	return string(buf)
 }
 
