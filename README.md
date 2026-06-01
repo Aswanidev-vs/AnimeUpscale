@@ -190,14 +190,94 @@ au.exe -video -i movie.mp4 -o movie-4k.mp4 -engine realsr -target 4k -scale 4 -v
 | `-s`, `-scale` | `2` | Upscale scale factor (`2`, `3`, `4`) | `-scale 4` |
 | `-target` | *None* | Dimensions target: `2k` (longest side 2048px) or `4k` (3840px) | `-target 4k` |
 | `-noise` | `0` | Denoise level for waifu2x/realcugan | `-noise 2` |
-| `-gpu` | `auto` | GPU ID to use; use `-1` for CPU mode | `-gpu 0` |
-| `-model-name` | *None* | Model name (realesrgan: `realesr-animevideov3` (default), `realesrgan-x4plus-anime`, `realesrgan-x4plus`; realsr: `DF2K_JPEG` (default), `DF2K`) | `-model-name realesrgan-x4plus-anime` |
+| `-gpu` | `auto` | GPU ID or processor backend. For `anime4kcpp`, use index, index combination (`opencl:0`), or raw backend `cpu` / `opencl` / `cuda`. For others, use `-1` for CPU mode | `-gpu opencl` |
+| `-model-name` | *None* | Model name. (realesrgan: `realesr-animevideov3`, etc.; realsr: `DF2K`, etc.; anime4kcpp: custom CNN model like `acnet-legacy-gan` (default), `acnet-f8b8`, `artcnn-c4f32`, `fsrcnnx-f16b4`, etc. Run `ac_cli --lm` to list) | `-model-name artcnn-c4f32` |
+| `-threads` | *None* | Processor threads override (e.g. `1:2:2` for external engines, single digit `-threads 4` for Anime4KCPP) | `-threads 4` |
 | `-tile-size` | `0` | Divide large images into tiles to save VRAM (e.g., `128`) | `-tile-size 128` |
 | `-video-workers`| `1` | Bounded goroutine worker pool size for video frame upscaling | `-video-workers 4` |
 | `-benchmark` | `false` | Enables stage timer outputs and writes `bench.json` | `-benchmark` |
 | `-sharpen` | `0.15` | Builtin-only unsharp amount (0 to disable) | `-sharpen 0.3` |
 | `-grayscale` | `false` | Builtin-only grayscale conversion before upscaling | `-grayscale` |
 | `-keep-temp` | `false` | Keep temporary extracted frame folders | `-keep-temp` |
+
+---
+
+---
+
+## Anime4KCPP Engine Integration Guide (`-engine anime4kcpp`)
+
+The **Anime4KCPP** engine uses powerful CNN-based and legacy upscaling algorithms. It is natively auto-detected inside `Anime4KCPP-CLI-v3.2.0-x64-MSVC/` or a project `bin/` directory.
+
+### Custom Backend Selection (`-gpu`)
+Use the `-gpu` flag to target specific GPU computing architectures or hardware processors:
+- `-gpu cpu`: General-purpose CPU processing (highly optimized with SIMD).
+- `-gpu opencl`: Cross-platform OpenCL acceleration (compatible with AMD, Intel, and NVIDIA).
+- `-gpu cuda`: Direct hardware acceleration on NVIDIA GPUs.
+- Custom Device Index: Target a specific device (e.g., `-gpu 1` or `-gpu opencl:0`).
+
+### Model Options (`-model-name`)
+Specify modern CNNs or legacy filters. The engine supports a vast selection of models spanning different architecture profiles:
+- **Legacy CNNs**:
+  - `acnet-legacy-gan` (Default): High performance, detail enhancement.
+  - `acnet-legacy-hdn0` to `acnet-legacy-hdn3`: Four levels of standard denoising.
+- **ACNet VGG/ResNet Styles**:
+  - `acnet-f8b4` to `acnet-f8b18`: Balanced networks (e.g. `acnet-f8b18-box` for sharp vector styles).
+  - `arnet-f8b8` to `arnet-f8b64-box-hdn`: Deep ResNet designs from minimal to heavy denoising styles.
+- **ArtCNN Premium Networks**:
+  - `artcnn-c4f16` / `artcnn-c4f32`: Neutral premium CNN layers.
+  - `artcnn-c4f32-dn`: Denoise and soften style.
+  - `artcnn-c4f32-ds`: Denoise and sharpen style.
+- **FSRCNNX Super-Resolution**:
+  - `fsrcnnx-f8b4` / `fsrcnnx-f16b4`: Highly accurate reconstruction networks.
+  - `fsrcnnx-f16b4-distort-plus`: Best-in-class recovery for highly compressed media.
+
+*Tip: Run `./Anime4KCPP-CLI-v3.2.0-x64-MSVC/ac_cli.exe --lm` to view all parameters and descriptions.*
+
+### Thread Assignment & Resource Limits for Video Upscaling (`-threads` vs `-video-workers`)
+When upscaling video files, performance is determined by two separate layers of concurrency:
+
+1. **`-video-workers` (Frame level)**: Controls the number of frames being upscaled concurrently (Go routine workers).
+2. **`-threads` (Processor level)**: Controls the internal threads used by the engine for **each frame**.
+
+#### Allocation Limits and Safety Rules
+- **GPU (OpenCL / CUDA) limits**: GPUs process calls in pipelines. Setting `-video-workers` too high (e.g. $>4$) will saturate VRAM and GPU compute queues, causing crashes (`vkQueueSubmit failed`). Keep `-video-workers` between `1` and `4` depending on VRAM.
+- **CPU limits**: The total assigned CPU threads must not saturate your physical CPU cores. 
+  $$\text{Total CPU Threads} = (\text{video-workers}) \times (\text{threads})$$
+  Keep this total strictly **under or equal to** your hardware thread limit:
+  - If CPU has 16 threads: set `-video-workers 4` and `-threads 4` (total 16), or `-video-workers 2` and `-threads 8` (total 16).
+  - Setting `-threads 0` tells the engine to auto-allocate based on hardware thread limits.
+
+### Examples
+
+#### Basic Anime4KCPP Image Upscaling:
+```powershell
+au.exe -i input.png -o output.png -engine anime4kcpp -scale 2 -gpu opencl
+```
+
+#### High-Quality CNN Upscale (ArtCNN):
+```powershell
+au.exe -i input.png -o output.png -engine anime4kcpp -scale 2 -model-name artcnn-c4f32 -gpu cuda
+```
+
+#### Vector Art / Sharp Line-Art Restoration (ACNet Box model):
+```powershell
+au.exe -i lines.png -o sharp-lines.png -engine anime4kcpp -scale 2 -model-name acnet-f8b18-box -gpu opencl
+```
+
+#### Legacy Denoising (ACNet GAN with Denoise lvl 2):
+```powershell
+au.exe -i noise.jpg -o clean.png -engine anime4kcpp -scale 2 -model-name acnet-legacy-hdn2 -gpu cpu
+```
+
+#### Heavy Artifact Recovery / Highly Compressed Media (FSRCNNX Distort Plus):
+```powershell
+au.exe -i artifacts.jpg -o restored.png -engine anime4kcpp -scale 2 -model-name fsrcnnx-f16b4-distort-plus -gpu cuda
+```
+
+#### Bounded Parallel Video Upscaling:
+```powershell
+au.exe -video -i in.mp4 -o out.mp4 -engine anime4kcpp -scale 2 -target 2k -model-name acnet-f8b18 -threads 2 -video-workers 4 -gpu opencl
+```
 ---
 
 ## Tile Size Guide (`-tile-size`)

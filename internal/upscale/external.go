@@ -243,19 +243,83 @@ func NewRealSREngine() Engine {
 	}
 }
 
+var (
+	cacheAnime4KCPPBinary string
+)
+
+func locateAnime4KCPP() (binaryPath, modelPath string, ok bool, detail string) {
+	if cacheAnime4KCPPBinary != "" {
+		return cacheAnime4KCPPBinary, "", true, "cached"
+	}
+	defer func() {
+		if ok {
+			cacheAnime4KCPPBinary = binaryPath
+		}
+	}()
+	for _, candidate := range []string{"ac_cli.exe", "ac_cli"} {
+		if path, err := exec.LookPath(candidate); err == nil {
+			return path, "", true, "PATH"
+		}
+		if fileExists(candidate) {
+			return filepath.Clean(candidate), "", true, "workspace"
+		}
+	}
+	roots := []string{
+		"bin",
+		"Anime4KCPP-CLI-v3.2.0-x64-MSVC",
+	}
+	for _, root := range roots {
+		for _, name := range []string{"ac_cli.exe", "ac_cli"} {
+			path := filepath.Clean(filepath.Join(root, name))
+			if fileExists(path) {
+				return path, "", true, "workspace"
+			}
+		}
+	}
+	return "", "", false, "binary not found in PATH or Anime4KCPP folder"
+}
+
 func NewAnime4KCPPEngine() Engine {
 	return externalEngine{
 		name:     "anime4kcpp",
 		binaries: []string{"ac_cli.exe", "ac_cli"},
-		note:     "wrapped external Anime4KCPP CLI",
+		note:     "wrapped Anime4KCPP CLI (use -model-name for custom CNN model, -gpu opencl|cuda)",
+		locate:   locateAnime4KCPP,
 		builder: func(req Request, _ string) []string {
 			args := []string{
 				"-i", req.Input,
 				"-o", req.Output,
-				"-z", strconv.Itoa(req.Scale),
 			}
+			// Use floats or scale ratio
+			args = append(args, "-f", strconv.Itoa(req.Scale))
+
+			// Model
+			if req.ModelName != "" {
+				args = append(args, "-m", req.ModelName)
+			}
+
+			// Threads
+			if req.Threads != "" {
+				args = append(args, "-t", req.Threads)
+			}
+
+			// GPU or Processor/Device options
 			if req.GPUID == "-1" {
-				args = append(args, "-q")
+				args = append(args, "-p", "cpu")
+			} else if req.GPUID != "" && req.GPUID != "auto" {
+				// if GPUID has a non-numeric processor name (e.g. opencl/cuda), parse it
+				if req.GPUID == "opencl" || req.GPUID == "cuda" || req.GPUID == "cpu" {
+					args = append(args, "-p", req.GPUID)
+				} else {
+					// standard index or compound format
+					parts := strings.Split(req.GPUID, ":")
+					if len(parts) > 1 {
+						args = append(args, "-p", parts[0])
+						args = append(args, "-d", parts[1])
+					} else {
+						args = append(args, "-d", req.GPUID)
+					}
+				}
 			}
 			return args
 		},
