@@ -40,6 +40,7 @@ type config struct {
 	VideoCodec   string
 	VideoWorkers int
 	Benchmark    bool
+	LayerMode    string
 }
 
 const version = "0.1.0"
@@ -75,7 +76,8 @@ func Run(args []string) error {
 	fs.StringVar(&cfg.VideoCodec, "video-codec", "libx264", "video codec for video mode")
 	fs.IntVar(&cfg.VideoWorkers, "video-workers", 1, "number of parallel upscaling workers for video mode (1 = sequential)")
 	fs.BoolVar(&cfg.Benchmark, "benchmark", false, "print per-stage timings and write benchmark JSON (bench.json)")
- 
+	fs.StringVar(&cfg.LayerMode, "layers", "visible", "psd layer mode: visible|all")
+
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Anime image upscaler CLI")
 		fmt.Fprintln(fs.Output(), "")
@@ -88,6 +90,8 @@ func Run(args []string) error {
 		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine realesrgan -scale 4 -model-name realesrgan-x4plus-anime")
 		fmt.Fprintln(fs.Output(), "  au -i in.png -o out.png -engine anime4kcpp -scale 2 -model-name artcnn-c4f32 -gpu opencl")
 		fmt.Fprintln(fs.Output(), "  au -i frame.jpg -o frame@4x.png -engine waifu2x -scale 4 -noise 2")
+		fmt.Fprintln(fs.Output(), "  au -i design.psd -o design-upscaled.psd -engine realesrgan -scale 4")
+		fmt.Fprintln(fs.Output(), "  au -i design.psd -o design-upscaled.psd -layers all -engine builtin -scale 2")
 		fmt.Fprintln(fs.Output(), "  au -list-engines")
 		fmt.Fprintln(fs.Output(), "")
 		fs.PrintDefaults()
@@ -177,6 +181,7 @@ func Run(args []string) error {
 		TTA:       cfg.TTA,
 		Sharpen:   cfg.Sharpen,
 		Grayscale: cfg.Grayscale,
+		LayerMode: cfg.LayerMode,
 	}
 
 	if err := os.MkdirAll(filepath.Dir(req.Output), 0o755); err != nil && filepath.Dir(req.Output) != "." {
@@ -194,6 +199,9 @@ func Run(args []string) error {
 	fmt.Printf("engine: %s\n", result.Engine)
 	fmt.Printf("output: %s\n", result.Output)
 	fmt.Printf("size: %dx%d -> %dx%d\n", result.InputWidth, result.InputHeight, result.OutputWidth, result.OutputHeight)
+	if result.LayerCount > 0 {
+		fmt.Printf("layers: %d\n", result.LayerCount)
+	}
 	if result.Note != "" {
 		fmt.Printf("note: %s\n", result.Note)
 	}
@@ -243,6 +251,9 @@ func normalizeFormat(format, output string) string {
 	if ext == "png" {
 		return "png"
 	}
+	if ext == "psd" {
+		return "psd"
+	}
 	return ""
 }
 
@@ -260,6 +271,24 @@ func resolveTarget(inputPath, target string) (int, int, error) {
 }
 
 func targetFromLongestSide(path string, longestSide int) (int, int, error) {
+	// PSD files need special handling
+	if upscale.IsPSDFile(path) {
+		w, h, err := upscale.PSDDimensions(path)
+		if err != nil {
+			return 0, 0, fmt.Errorf("read psd for target sizing: %w", err)
+		}
+		cfg := image.Config{Width: w, Height: h}
+		if cfg.Width <= 0 || cfg.Height <= 0 {
+			return 0, 0, errors.New("invalid psd dimensions")
+		}
+		if cfg.Width >= cfg.Height {
+			scale := float64(longestSide) / float64(cfg.Width)
+			return longestSide, max(1, int(scale*float64(cfg.Height)+0.5)), nil
+		}
+		scale := float64(longestSide) / float64(cfg.Height)
+		return max(1, int(scale*float64(cfg.Width)+0.5)), longestSide, nil
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, 0, fmt.Errorf("open input for target sizing: %w", err)
@@ -294,6 +323,8 @@ func resolveOutputPath(inputPath, outputPath, target, format string) (string, er
 		ext = "jpg"
 	case "png":
 		ext = "png"
+	case "psd":
+		ext = "psd"
 	}
 	if ext == "" {
 		ext = "png"

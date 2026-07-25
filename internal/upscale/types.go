@@ -18,6 +18,7 @@ type Request struct {
 	TTA       bool
 	Sharpen   float64
 	Grayscale bool
+	LayerMode string // psd layer mode: "visible" (default), "all"
 }
 
 type Result struct {
@@ -28,6 +29,7 @@ type Result struct {
 	OutputWidth  int
 	OutputHeight int
 	Note         string
+	LayerCount   int // number of layers processed (for PSD input)
 }
 
 type EngineInfo struct {

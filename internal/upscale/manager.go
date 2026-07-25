@@ -45,6 +45,11 @@ func (m *Manager) Available() []EngineInfo {
 }
 
 func (m *Manager) Upscale(req Request) (Result, error) {
+	// PSD input → route through the PSD pipeline
+	if isPSDFile(req.Input) {
+		return newPSDPipeline(m).Process(req)
+	}
+
 	if req.Engine == "" || req.Engine == "auto" {
 		for _, engine := range m.engines {
 			if ok, _ := engine.Available(); ok {

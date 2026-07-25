@@ -198,11 +198,38 @@ au.exe -video -i movie.mp4 -o movie-4k.mp4 -engine realsr -target 4k -scale 4 -v
 | `-benchmark` | `false` | Enables stage timer outputs and writes `bench.json` | `-benchmark` |
 | `-sharpen` | `0.15` | Builtin-only unsharp amount (0 to disable) | `-sharpen 0.3` |
 | `-grayscale` | `false` | Builtin-only grayscale conversion before upscaling | `-grayscale` |
+| `-layers` | `visible` | PSD layer mode: `visible` (upscale only visible layers) or `all` (upscale all layers) | `-layers all` |
 | `-keep-temp` | `false` | Keep temporary extracted frame folders | `-keep-temp` |
 
 ---
 
+### 4. Upscale PSD Files (Layered Photoshop Documents)
+
+Process Photoshop PSD files by upscaling each individual layer and reassembling them into a new PSD. Layer metadata (name, opacity, blend mode, visibility, position) is preserved and positions are scaled proportionally.
+
+```powershell
+# Upscale all visible layers (default) using Real-ESRGAN
+au.exe -i design.psd -o design-upscaled.psd -engine realesrgan -scale 4
+
+# Upscale all layers including hidden ones
+au.exe -i design.psd -o design-upscaled.psd -layers all -engine builtin -scale 2
+
+# Built-in engine with line enhancement
+au.exe -i artwork.psd -o artwork-upscaled.psd -engine builtin -scale 2 -sharpen 0.25
+```
+
+**How it works:**
+1. Each layer is extracted as a temporary PNG file
+2. Each layer PNG is upscaled individually using the selected engine
+3. Layer bounds (position/size) are scaled by the scale factor
+4. All upscaled layers are reassembled into a new PSD with preserved metadata
+5. A composite preview image is generated from the visible layers
+
+**Supported features:** RGB 8-bit PSDs with RLE-compressed layers; layer names, blend modes, opacity, visibility flags, and clipping are preserved.
+
 ---
+
+
 
 ## Anime4KCPP Engine Integration Guide (`-engine anime4kcpp`)
 
