@@ -196,11 +196,22 @@
           <span id="status-text">Idle</span>
         </div>
         <div class="output-actions">
+          <div class="view-toggle" id="view-toggle" hidden>
+            <button type="button" class="view-btn active" data-view="side" title="Side by side">
+              <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="2" width="6" height="12" rx="1" fill="currentColor"/><rect x="9" y="2" width="6" height="12" rx="1" fill="currentColor"/></svg>
+              <span>Side by side</span>
+            </button>
+            <button type="button" class="view-btn" data-view="compare" title="Overlay compare">
+              <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="2" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="1.2"/><polygon points="7,8 5,6 5,10" fill="currentColor"/><polygon points="9,8 11,6 11,10" fill="currentColor"/></svg>
+              <span>Compare</span>
+            </button>
+          </div>
           <button type="button" id="btn-download" class="btn primary" hidden>Download result</button>
         </div>
       </div>
 
-      <div class="preview-row">
+      <!-- Side-by-side view -->
+      <div class="preview-row" id="view-side">
         <figure class="preview" id="preview-input">
           <figcaption>Input</figcaption>
           <div class="preview-body" id="preview-input-body">
@@ -213,6 +224,25 @@
             <p class="muted small">Result will appear here.</p>
           </div>
         </figure>
+      </div>
+
+      <!-- Overlay compare view -->
+      <div class="compare-container" id="view-compare" hidden>
+        <div class="compare-wrapper" id="compare-wrapper">
+          <img class="compare-img compare-after" id="compare-after" alt="Output" />
+          <div class="compare-clip" id="compare-clip">
+            <img class="compare-img compare-before" id="compare-before" alt="Input" />
+          </div>
+          <div class="compare-slider" id="compare-slider">
+            <div class="compare-slider-line"></div>
+            <div class="compare-slider-handle">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M5 8l3-3v6zM11 8l-3-3v6z" fill="currentColor"/></svg>
+            </div>
+          </div>
+          <span class="compare-label compare-label-left">Input</span>
+          <span class="compare-label compare-label-right">Output</span>
+        </div>
+        <p class="compare-hint">Drag the slider to compare input vs output</p>
       </div>
 
       <details class="log" open>

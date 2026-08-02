@@ -30,6 +30,15 @@
   const previewOutputBody = $("preview-output-body");
   const toasts = $("toasts");
 
+  const viewToggle = $("view-toggle");
+  const viewSide = $("view-side");
+  const viewCompare = $("view-compare");
+  const compareWrapper = $("compare-wrapper");
+  const compareClip = $("compare-clip");
+  const compareSlider = $("compare-slider");
+  const compareBefore = $("compare-before");
+  const compareAfter = $("compare-after");
+
   const noiseInput = $("noise");
   const noiseOut = $("noise-out");
   const sharpenInput = $("sharpen");
@@ -104,6 +113,58 @@
     anime4kcpp: "opencl",
   };
 
+  // Engine tags — displayed as badges on each engine card.
+  // Categories: media, content, feature, gpu
+  const ENGINE_TAGS = {
+    auto: [
+      { label: "auto-select", cat: "feature" },
+    ],
+    realesrgan: [
+      { label: "image", cat: "media" },
+      { label: "video", cat: "media" },
+      { label: "anime", cat: "content" },
+      { label: "general", cat: "content" },
+      { label: "quality", cat: "feature" },
+      { label: "vulkan", cat: "gpu" },
+    ],
+    realsr: [
+      { label: "image", cat: "media" },
+      { label: "photo", cat: "content" },
+      { label: "quality", cat: "feature" },
+      { label: "denoise", cat: "feature" },
+      { label: "vulkan", cat: "gpu" },
+    ],
+    builtin: [
+      { label: "image", cat: "media" },
+      { label: "fast", cat: "feature" },
+      { label: "no deps", cat: "feature" },
+    ],
+    anime4kcpp: [
+      { label: "image", cat: "media" },
+      { label: "video", cat: "media" },
+      { label: "anime", cat: "content" },
+      { label: "line-art", cat: "content" },
+      { label: "fast", cat: "feature" },
+      { label: "denoise", cat: "feature" },
+      { label: "opencl", cat: "gpu" },
+    ],
+    waifu2x: [
+      { label: "image", cat: "media" },
+      { label: "anime", cat: "content" },
+      { label: "photo", cat: "content" },
+      { label: "denoise", cat: "feature" },
+      { label: "vulkan", cat: "gpu" },
+    ],
+    realcugan: [
+      { label: "image", cat: "media" },
+      { label: "video", cat: "media" },
+      { label: "anime", cat: "content" },
+      { label: "general", cat: "content" },
+      { label: "quality", cat: "feature" },
+      { label: "vulkan", cat: "gpu" },
+    ],
+  };
+
   // ---------- toast helper ----------
   function toast(message, kind = "ok", timeout = 3500) {
     const el = document.createElement("div");
@@ -166,10 +227,17 @@
       label.className = "engine-card";
       if (!e.available && e.name !== "auto") label.classList.add("disabled");
       label.dataset.engine = e.name;
+
+      const tags = (ENGINE_TAGS[e.name] || []).map((t) => {
+        const cls = "etag etag-" + t.cat;
+        return `<span class="${cls}">${escapeHTML(t.label)}</span>`;
+      }).join("");
+
       label.innerHTML = `
         <input type="radio" name="engine" value="${e.name}" ${e.name === "auto" ? "checked" : ""} ${!e.available && e.name !== "auto" ? "disabled" : ""}/>
         <span class="name">${e.name}</span>
         <span class="note">${escapeHTML(e.note || "")}</span>
+        <div class="etag-row">${tags}</div>
         <span class="pill ${e.available ? "ok" : "miss"}">${e.available ? "ready" : "missing"}</span>
       `;
       engineGrid.appendChild(label);
@@ -206,12 +274,13 @@
   }
 
   function updateModelSuggestions(engine) {
-    modelList.innerHTML = "";
+    modelName.innerHTML = "";
     const list = ENGINE_MODELS[engine] || [];
     for (const m of list) {
       const opt = document.createElement("option");
-      opt.value = m;
-      modelList.appendChild(opt);
+      opt.value = m.value;
+      opt.textContent = m.label;
+      modelName.appendChild(opt);
     }
     modelHint.textContent = list.length
       ? `Suggestions: ${list.slice(0, 4).join(", ")}${list.length > 4 ? "…" : ""}. Leave blank for the default.`
@@ -261,6 +330,8 @@
     dropzoneName.hidden = false;
     dropzoneName.textContent = `${file.name} · ${formatBytes(file.size)}`;
     showInputPreview(file, pickedURL);
+    // update compare view input
+    compareBefore.src = pickedURL;
     const m = currentMode();
     showVideoFields(m === "video");
     if (m === "video" && document.querySelector('input[name="engine"]:checked')?.value === "builtin") {
@@ -327,16 +398,6 @@
       fileInput.click();
     }
   });
-  });
-  ["dragleave", "drop"].forEach((evt) => {
-    dropzone.addEventListener("dragover", (e) => e.preventDefault());
-    dropzone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropzone.classList.remove("dragover");
-      const f = e.dataTransfer?.files?.[0];
-      if (f) setFile(f);
-    });
-  });
 
   // ---------- sliders ----------
   noiseInput.addEventListener("input", () => {
@@ -367,6 +428,14 @@
     clearLog();
     setStatus("idle", "Idle");
     btnDownload.hidden = true;
+    viewToggle.hidden = true;
+    viewSide.hidden = false;
+    viewCompare.hidden = true;
+    compareBefore.src = "";
+    compareAfter.src = "";
+    setComparePos(0.5);
+    viewBtns.forEach((b) => b.classList.remove("active"));
+    viewBtns[0].classList.add("active");
     if (currentJobOutputURL) { URL.revokeObjectURL(currentJobOutputURL); currentJobOutputURL = null; }
     currentJobId = null;
     onEngineChange("auto");
@@ -489,6 +558,7 @@
       v.controls = true;
       v.preload = "metadata";
       previewOutputBody.appendChild(v);
+      viewToggle.hidden = true;
     } else {
       const img = document.createElement("img");
       img.src = url;
@@ -498,8 +568,63 @@
         previewOutputBody.innerHTML = `<p class="placeholder">Output ready, but preview could not be loaded.<br/><a class="btn primary" href="${url}" download>Download</a></p>`;
       };
       previewOutputBody.appendChild(img);
+      // populate compare view
+      viewToggle.hidden = false;
+      compareAfter.src = url;
+      compareBefore.src = pickedURL || "";
+      setComparePos(0.5);
     }
   }
+
+  // ---------- compare view ----------
+  let compareDragging = false;
+
+  function setComparePos(pct) {
+    pct = Math.max(0, Math.min(1, pct));
+    compareClip.style.width = (pct * 100) + "%";
+    compareSlider.style.left = (pct * 100) + "%";
+  }
+
+  function getComparePct(e) {
+    const rect = compareWrapper.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    return x / rect.width;
+  }
+
+  compareWrapper.addEventListener("mousedown", (e) => {
+    compareDragging = true;
+    setComparePos(getComparePct(e));
+  });
+  compareWrapper.addEventListener("touchstart", (e) => {
+    compareDragging = true;
+    setComparePos(getComparePct(e));
+  }, { passive: true });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!compareDragging) return;
+    e.preventDefault();
+    setComparePos(getComparePct(e));
+  });
+  document.addEventListener("touchmove", (e) => {
+    if (!compareDragging) return;
+    setComparePos(getComparePct(e));
+  }, { passive: true });
+
+  document.addEventListener("mouseup", () => { compareDragging = false; });
+  document.addEventListener("touchend", () => { compareDragging = false; });
+
+  // view toggle
+  const viewBtns = viewToggle.querySelectorAll(".view-btn");
+  viewBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      viewBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const view = btn.dataset.view;
+      viewSide.hidden = view !== "side";
+      viewCompare.hidden = view !== "compare";
+      if (view === "compare") setComparePos(0.5);
+    });
+  });
 
   function triggerDownload(url, filename) {
     const a = document.createElement("a");
