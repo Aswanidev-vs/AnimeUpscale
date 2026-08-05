@@ -1,12 +1,13 @@
-# Anime Upscaler CLI
+# Anime Upscaler 
 
-A high-performance Go command-line tool for upscaling anime, illustrations, and videos.
+A high-performance Go command-line tool for upscaling anime, illustrations, and videos provide both **cli** and  **browser-based GUI**.
 
 This project packages:
 - A working **Real-ESRGAN** native backend using a project-level `bin/` + `models/` layout (highly recommended for anime).
 - A working **RealSR** native backend using a project-level `bin/` + `models/` layout.
 - A built-in, zero-dependency, pure Go fallback for quick upscale and enhancement.
 - Wrappers for `anime4kcpp`, `waifu2x`, and `realcugan` (requires installing their CLI tools separately).
+- A **Web UI** for drag-and-drop upscaling directly from your browser — no terminal needed.
 
 ---
 
@@ -122,6 +123,49 @@ go install github.com/Aswanidev-vs/animeupscale/cmd/au@latest
 ```powershell
 go build -o au.exe .
 ```
+
+---
+
+## Web GUI (Browser-Based UI)
+
+AnimeUpscale includes a browser-based GUI for upscaling images and videos without touching the command line. A lightweight Go HTTP server wraps `au.exe` and serves a responsive web interface.
+
+### Launch the GUI
+
+From the project root (where `au.exe` lives):
+
+```powershell
+# Build the web server
+go build -o web\server.exe .\web
+
+# Start the server
+.\web\server.exe
+```
+
+Then open **http://127.0.0.1:8080** in your browser.
+
+### GUI Features
+
+- **Drag & drop** file upload (images: PNG, JPG, WebP; videos: MP4, MKV, WebM, MOV, AVI)
+- **Auto-detect** mode — switches between image and video pipelines based on file extension
+- **Engine selector** — picks from all detected engines (Real-ESRGAN, RealSR, Anime4KCPP, waifu2x, realcugan, builtin)
+- **Scale & target** — choose 2x/3x/4x upscaling or preset targets (2K, 4K)
+- **Model picker** — select engine-specific models from the dropdown
+- **GPU / tile-size controls** — target specific GPUs and tune VRAM usage
+- **Engine-specific options** — denoise level, threads, TTA, sharpen, grayscale, video workers
+- **Real-time progress** — live streaming log via Server-Sent Events (SSE)
+- **Side-by-side & overlay compare** — visually compare input vs output with a draggable slider
+- **One-click download** — save the upscaled result directly from the browser
+
+### Server Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-addr` | `127.0.0.1:8080` | HTTP listen address |
+| `-au`   | auto-detect | Path to `au.exe` |
+| `-workdir` | auto-detect | Project root (parent of `web/`) |
+
+> **Note:** The server only listens on `127.0.0.1` by default. Do not expose it to the public internet — there is no authentication and uploads are arbitrary files.
 
 ---
 
